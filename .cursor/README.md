@@ -23,6 +23,10 @@ The environment declares `github.com/mattermost/enterprise` in `repositoryDepend
 
 Git-triggered automations (for example, a PR label) still launch in a single-repo layout. `repositoryDependencies` only adds enterprise to the token scope in that mode; it does not check the repo out. The install hook therefore clones `https://github.com/mattermost/enterprise.git` into `../enterprise` when no usable checkout is present. It uses `ENTERPRISE_BRANCH` when set, otherwise preferring an exact branch matching the Mattermost checkout and falling back to Enterprise's default branch. If the sibling path is not writable or is not a usable work tree (for example a bare repo), the hook clones into `$HOME/enterprise` and writes `BUILD_ENTERPRISE_DIR` to `server/config.override.mk`. `server/Makefile` includes that file before Enterprise detection so `make run-server` honors the fallback path.
 
+## Team Edition vs Enterprise
+
+`environment.json` sets `CLOUD_AGENT_SKIP_ENTERPRISE=true` on the install hook so agents can build and run Team Edition when the GitHub token cannot read `mattermost/enterprise`. After Enterprise access is available, change the install line back to `bash .cursor/scripts/cloud-agent-install.sh` (or set `CLOUD_AGENT_SKIP_ENTERPRISE=false` in the environment dashboard if you override install there).
+
 ## Useful Skips
 
 Set these environment variables to `true` to shorten startup for narrow tasks:
