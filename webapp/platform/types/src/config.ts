@@ -708,6 +708,12 @@ export type ThemeSettings = {
     AllowedThemes: string[];
 };
 
+export type OpenIDSettings = SSOSettings & {
+    Issuer?: string;
+    EnableJIT?: boolean;
+    DevAllowHTTPLoopback?: boolean;
+};
+
 export type SSOSettings = {
     Enable: boolean;
     Secret: string;
@@ -1129,7 +1135,7 @@ export type AdminConfig = {
     GitLabSettings: SSOSettings;
     GoogleSettings: SSOSettings;
     Office365Settings: Office365Settings;
-    OpenIdSettings: SSOSettings;
+    OpenIdSettings: OpenIDSettings;
     LdapSettings: LdapSettings;
     ComplianceSettings: ComplianceSettings;
     LocalizationSettings: LocalizationSettings;
