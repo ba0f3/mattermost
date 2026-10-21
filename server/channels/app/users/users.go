@@ -50,6 +50,9 @@ func (us *UserService) CreateUser(rctx request.CTX, user *model.User, opts UserC
 		if ok, err := us.store.IsEmpty(true); err != nil {
 			return nil, errors.Wrap(UserStoreIsEmptyError, err.Error())
 		} else if ok {
+			if user.AuthService == model.ServiceOpenid {
+				return nil, errors.New("oidc bootstrap not allowed on empty site")
+			}
 			user.Roles = model.SystemAdminRoleId + " " + model.SystemUserRoleId
 		}
 	}

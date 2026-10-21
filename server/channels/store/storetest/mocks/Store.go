@@ -834,6 +834,26 @@ func (_m *Store) OAuth() store.OAuthStore {
 	return r0
 }
 
+// OIDCIdentity provides a mock function with no fields
+func (_m *Store) OIDCIdentity() store.OIDCIdentityStore {
+	ret := _m.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for OIDCIdentity")
+	}
+
+	var r0 store.OIDCIdentityStore
+	if rf, ok := ret.Get(0).(func() store.OIDCIdentityStore); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(store.OIDCIdentityStore)
+		}
+	}
+
+	return r0
+}
+
 // OutgoingOAuthConnection provides a mock function with no fields
 func (_m *Store) OutgoingOAuthConnection() store.OutgoingOAuthConnectionStore {
 	ret := _m.Called()

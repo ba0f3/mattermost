@@ -46,6 +46,7 @@ type RetryLayer struct {
 	LinkMetadataStore               store.LinkMetadataStore
 	NotifyAdminStore                store.NotifyAdminStore
 	OAuthStore                      store.OAuthStore
+	OIDCIdentityStore               store.OIDCIdentityStore
 	OutgoingOAuthConnectionStore    store.OutgoingOAuthConnectionStore
 	PluginStore                     store.PluginStore
 	PostStore                       store.PostStore
@@ -190,6 +191,10 @@ func (s *RetryLayer) NotifyAdmin() store.NotifyAdminStore {
 
 func (s *RetryLayer) OAuth() store.OAuthStore {
 	return s.OAuthStore
+}
+
+func (s *RetryLayer) OIDCIdentity() store.OIDCIdentityStore {
+	return s.OIDCIdentityStore
 }
 
 func (s *RetryLayer) OutgoingOAuthConnection() store.OutgoingOAuthConnectionStore {
@@ -468,6 +473,11 @@ type RetryLayerNotifyAdminStore struct {
 
 type RetryLayerOAuthStore struct {
 	store.OAuthStore
+	Root *RetryLayer
+}
+
+type RetryLayerOIDCIdentityStore struct {
+	store.OIDCIdentityStore
 	Root *RetryLayer
 }
 
@@ -8650,6 +8660,90 @@ func (s *RetryLayerOAuthStore) UpdateApp(app *model.OAuthApp) (*model.OAuthApp, 
 	tries := 0
 	for {
 		result, err := s.OAuthStore.UpdateApp(app)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerOIDCIdentityStore) DeleteForUser(rctx request.CTX, userID string) error {
+
+	tries := 0
+	for {
+		err := s.OIDCIdentityStore.DeleteForUser(rctx, userID)
+		if err == nil {
+			return nil
+		}
+		if !isRepeatableError(err) {
+			return err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerOIDCIdentityStore) Ensure(rctx request.CTX, identity *model.OIDCIdentity) error {
+
+	tries := 0
+	for {
+		err := s.OIDCIdentityStore.Ensure(rctx, identity)
+		if err == nil {
+			return nil
+		}
+		if !isRepeatableError(err) {
+			return err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerOIDCIdentityStore) Get(rctx request.CTX, identityKey string) (*model.OIDCIdentity, error) {
+
+	tries := 0
+	for {
+		result, err := s.OIDCIdentityStore.Get(rctx, identityKey)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerOIDCIdentityStore) GetForUser(rctx request.CTX, userID string) (*model.OIDCIdentity, error) {
+
+	tries := 0
+	for {
+		result, err := s.OIDCIdentityStore.GetForUser(rctx, userID)
 		if err == nil {
 			return result, nil
 		}
@@ -17630,6 +17724,27 @@ func (s *RetryLayerTokenStore) GetByToken(token string) (*model.Token, error) {
 
 }
 
+func (s *RetryLayerTokenStore) GetByTokenFromMaster(token string) (*model.Token, error) {
+
+	tries := 0
+	for {
+		result, err := s.TokenStore.GetByTokenFromMaster(token)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
 func (s *RetryLayerTokenStore) GetTokenByTypeAndEmail(tokenType string, email string) (*model.Token, error) {
 
 	tries := 0
@@ -20814,6 +20929,7 @@ func New(childStore store.Store) *RetryLayer {
 	newStore.LinkMetadataStore = &RetryLayerLinkMetadataStore{LinkMetadataStore: childStore.LinkMetadata(), Root: &newStore}
 	newStore.NotifyAdminStore = &RetryLayerNotifyAdminStore{NotifyAdminStore: childStore.NotifyAdmin(), Root: &newStore}
 	newStore.OAuthStore = &RetryLayerOAuthStore{OAuthStore: childStore.OAuth(), Root: &newStore}
+	newStore.OIDCIdentityStore = &RetryLayerOIDCIdentityStore{OIDCIdentityStore: childStore.OIDCIdentity(), Root: &newStore}
 	newStore.OutgoingOAuthConnectionStore = &RetryLayerOutgoingOAuthConnectionStore{OutgoingOAuthConnectionStore: childStore.OutgoingOAuthConnection(), Root: &newStore}
 	newStore.PluginStore = &RetryLayerPluginStore{PluginStore: childStore.Plugin(), Root: &newStore}
 	newStore.PostStore = &RetryLayerPostStore{PostStore: childStore.Post(), Root: &newStore}

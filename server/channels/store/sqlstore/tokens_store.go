@@ -58,6 +58,26 @@ func (s SqlTokenStore) Delete(token string) error {
 	return nil
 }
 
+func (s SqlTokenStore) GetByTokenFromMaster(tokenString string) (*model.Token, error) {
+	var token model.Token
+
+	query, args, err := s.tokenSelectQuery.
+		Where(sq.Eq{"Token": tokenString}).
+		ToSql()
+	if err != nil {
+		return nil, errors.Wrap(err, "could not build sql query to get token store")
+	}
+
+	if err := s.GetMaster().Get(&token, query, args...); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, store.NewErrNotFound("Token", fmt.Sprintf("Token=%s", tokenString))
+		}
+		return nil, errors.Wrapf(err, "failed to get Token with value %s", tokenString)
+	}
+
+	return &token, nil
+}
+
 func (s SqlTokenStore) GetByToken(tokenString string) (*model.Token, error) {
 	var token model.Token
 

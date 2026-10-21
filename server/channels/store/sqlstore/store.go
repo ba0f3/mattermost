@@ -104,6 +104,7 @@ type SqlStoreStores struct {
 	postAcknowledgement        store.PostAcknowledgementStore
 	postPersistentNotification store.PostPersistentNotificationStore
 	desktopTokens              store.DesktopTokensStore
+	oidcIdentity               store.OIDCIdentityStore
 	channelBookmarks           store.ChannelBookmarkStore
 	channelGuard               store.ChannelGuardStore
 	scheduledPost              store.ScheduledPostStore
@@ -300,6 +301,7 @@ func New(settings model.SqlSettings, logger mlog.LoggerIFace, metrics einterface
 	store.stores.postAcknowledgement = newSqlPostAcknowledgementStore(store)
 	store.stores.postPersistentNotification = newSqlPostPersistentNotificationStore(store)
 	store.stores.desktopTokens = newSqlDesktopTokensStore(store, metrics)
+	store.stores.oidcIdentity = newSqlOIDCIdentityStore(store)
 	store.stores.channelBookmarks = newSqlChannelBookmarkStore(store)
 	store.stores.channelGuard = newSqlChannelGuardStore(store)
 	store.stores.scheduledPost = newScheduledPostStore(store)
@@ -922,6 +924,10 @@ func (ss *SqlStore) PostPersistentNotification() store.PostPersistentNotificatio
 
 func (ss *SqlStore) DesktopTokens() store.DesktopTokensStore {
 	return ss.stores.desktopTokens
+}
+
+func (ss *SqlStore) OIDCIdentity() store.OIDCIdentityStore {
+	return ss.stores.oidcIdentity
 }
 
 func (ss *SqlStore) ChannelBookmark() store.ChannelBookmarkStore {

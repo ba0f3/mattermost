@@ -63,6 +63,7 @@ type Store struct {
 	PostAcknowledgementStore        mocks.PostAcknowledgementStore
 	PostPersistentNotificationStore mocks.PostPersistentNotificationStore
 	DesktopTokensStore              mocks.DesktopTokensStore
+	OIDCIdentityStore               mocks.OIDCIdentityStore
 	ChannelBookmarkStore            mocks.ChannelBookmarkStore
 	ChannelGuardStore               mocks.ChannelGuardStore
 	ScheduledPostStore              mocks.ScheduledPostStore
@@ -128,6 +129,7 @@ func (s *Store) ChannelMemberHistory() store.ChannelMemberHistoryStore {
 func (s *Store) ChannelBookmark() store.ChannelBookmarkStore { return &s.ChannelBookmarkStore }
 func (s *Store) ChannelGuard() store.ChannelGuardStore       { return &s.ChannelGuardStore }
 func (s *Store) DesktopTokens() store.DesktopTokensStore     { return &s.DesktopTokensStore }
+func (s *Store) OIDCIdentity() store.OIDCIdentityStore     { return &s.OIDCIdentityStore }
 func (s *Store) NotifyAdmin() store.NotifyAdminStore         { return &s.NotifyAdminStore }
 func (s *Store) Group() store.GroupStore                     { return &s.GroupStore }
 func (s *Store) LinkMetadata() store.LinkMetadataStore       { return &s.LinkMetadataStore }

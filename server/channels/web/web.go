@@ -31,6 +31,7 @@ func New(srv *app.Server) *Web {
 		MainRouter: srv.Router,
 	}
 
+	web.InitOIDC()
 	web.InitOAuth()
 	web.InitWebhooks()
 	web.InitSaml()

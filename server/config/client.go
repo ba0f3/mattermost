@@ -451,6 +451,12 @@ func GenerateLimitedClientConfig(c *model.Config, telemetryID string, license *m
 		}
 	}
 
+	if c.OpenIdSettings.IsOSSOIDCEnabled() {
+		props["EnableSignUpWithOpenId"] = strconv.FormatBool(*c.OpenIdSettings.Enable)
+		props["OpenIdButtonColor"] = *c.OpenIdSettings.ButtonColor
+		props["OpenIdButtonText"] = *c.OpenIdSettings.ButtonText
+	}
+
 	for key, value := range c.FeatureFlags.ToMap() {
 		props["FeatureFlag"+key] = value
 	}

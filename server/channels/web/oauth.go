@@ -309,6 +309,10 @@ func completeOAuth(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 
 	service := c.Params.Service
+	if service == model.ServiceOpenid && c.App.OSSOIDCEnabled() {
+		c.Err = model.NewAppError("completeOAuth", "api.user.authorize_oauth_user.unsupported.app_error", nil, "use dedicated openid callback", http.StatusBadRequest)
+		return
+	}
 
 	auditRec := c.MakeAuditRecord(model.AuditEventCompleteOAuth, model.AuditStatusFail)
 	defer c.LogAuditRec(auditRec)

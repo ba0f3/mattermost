@@ -25,6 +25,9 @@ const (
 	TokenTypeOAuth           = "oauth"
 	TokenTypeSaml            = "saml"
 	TokenTypeSSOCodeExchange = "sso-code-exchange"
+	TokenTypeOIDCLogin         = "oidc_login"
+
+	OIDCLoginExpiryTime = 1000 * 60 * 5 // 5 minutes
 )
 
 type Token struct {
@@ -76,6 +79,8 @@ func (t *Token) IsExpired() bool {
 		expiryTime = InvitationExpiryTime
 	case TokenTypeGuestInvitation:
 		expiryTime = InvitationExpiryTime
+	case TokenTypeOIDCLogin:
+		expiryTime = OIDCLoginExpiryTime
 	}
 	return GetMillis() > (t.CreateAt + expiryTime)
 }

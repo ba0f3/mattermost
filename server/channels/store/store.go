@@ -43,6 +43,7 @@ type Store interface {
 	Preference() PreferenceStore
 	License() LicenseStore
 	Token() TokenStore
+	OIDCIdentity() OIDCIdentityStore
 	Emoji() EmojiStore
 	Status() StatusStore
 	FileInfo() FileInfoStore
@@ -748,10 +749,18 @@ type LicenseStore interface {
 	GetAll() ([]*model.LicenseRecord, error)
 }
 
+type OIDCIdentityStore interface {
+	Ensure(rctx request.CTX, identity *model.OIDCIdentity) error
+	Get(rctx request.CTX, identityKey string) (*model.OIDCIdentity, error)
+	GetForUser(rctx request.CTX, userID string) (*model.OIDCIdentity, error)
+	DeleteForUser(rctx request.CTX, userID string) error
+}
+
 type TokenStore interface {
 	Save(recovery *model.Token) error
 	Delete(token string) error
 	GetByToken(token string) (*model.Token, error)
+	GetByTokenFromMaster(token string) (*model.Token, error)
 	ConsumeOnce(tokenType, tokenStr string) (*model.Token, error)
 	Cleanup(expiryTime int64)
 	GetAllTokensByType(tokenType string) ([]*model.Token, error)

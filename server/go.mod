@@ -6,7 +6,7 @@ require (
 	code.sajari.com/docconv/v2 v2.0.0-pre.4
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
-	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
+	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.1-beta.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/avct/uasurfer v0.0.0-20250915105040-a942f6fb6edc
 	github.com/aws/aws-sdk-go-v2 v1.47.3
@@ -25,7 +25,7 @@ require (
 	github.com/getsentry/sentry-go v0.50.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/golang-migrate/migrate/v4 v4.20.1
+	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
@@ -35,7 +35,7 @@ require (
 	github.com/h2non/go-is-svg v0.0.0-20160927212452-35e8c4b0612c
 	github.com/hako/durafmt v0.0.0-20210608085754-5c1018a4e16b
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/memberlist v0.7.0
+	github.com/hashicorp/memberlist v0.6.0
 	github.com/icrowley/fake v0.0.0-20240710202011-f797eb4a99c0
 	github.com/isacikgoz/prompt v0.1.0
 	github.com/jaytaylor/html2text v0.0.0-20260303211410-1a4bdc82ecec
@@ -47,7 +47,7 @@ require (
 	github.com/mattermost/ldap v0.0.0-20231116144001-0f480c025956
 	github.com/mattermost/logr/v2 v2.0.22 // v2.0.23 defaults to sync.Map level cache; clear() fills 65535 entries
 	github.com/mattermost/mattermost-plugin-ai v1.14.2
-	github.com/mattermost/mattermost/server/public v0.5.0
+	github.com/mattermost/mattermost/server/public v0.2.1
 	github.com/mattermost/morph v1.1.0
 	github.com/mattermost/pdf v0.0.0-20260925085853-316d43e077e6
 	github.com/mattermost/rsc v0.0.0-20160330161541-bbaefb05eaa0
@@ -57,9 +57,9 @@ require (
 	github.com/minio/minio-go/v7 v7.4.1
 	github.com/opensearch-project/opensearch-go/v4 v4.8.1
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.25.0
+	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.3
-	github.com/prometheus/common v0.72.1
+	github.com/prometheus/common v0.67.5
 	github.com/redis/rueidis v1.0.79
 	github.com/reflog/dateconstraints v0.2.1
 	github.com/rs/cors v1.11.1
@@ -87,10 +87,17 @@ require (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/storage/internal v0.1.0 // indirect
-	github.com/apache/arrow-go/v18 v18.8.0 // indirect
+	github.com/coreos/go-oidc/v3 v3.17.0
+	golang.org/x/oauth2 v0.34.0
+)
+
+require (
+	github.com/apache/arrow-go/v18 v18.6.0 // indirect
+	github.com/armon/go-metrics v0.4.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
 )
 
 require (
@@ -149,7 +156,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
-	github.com/hashicorp/go-metrics v0.7.0 // indirect
+	github.com/hashicorp/go-metrics v0.6.0 // indirect
 	github.com/hashicorp/go-msgpack/v2 v2.1.5 // indirect
 	github.com/hashicorp/go-plugin v1.8.0 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
@@ -225,7 +232,7 @@ require (
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261012220534-4341edf3f941 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/grpc v1.81.0-dev // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect

@@ -4268,7 +4268,7 @@ type Config struct {
 	GitLabSettings              SSOSettings
 	GoogleSettings              SSOSettings
 	Office365Settings           Office365Settings
-	OpenIdSettings              SSOSettings
+	OpenIdSettings              OpenIDSettings
 	LdapSettings                LdapSettings
 	ComplianceSettings          ComplianceSettings
 	LocalizationSettings        LocalizationSettings
@@ -4341,7 +4341,7 @@ func (o *Config) GetSSOService(service string) *SSOSettings {
 	case ServiceOffice365:
 		return o.Office365Settings.SSOSettings()
 	case ServiceOpenid:
-		return &o.OpenIdSettings
+		return o.OpenIdSettings.SSOSettings()
 	}
 
 	return nil
@@ -4379,7 +4379,7 @@ func (o *Config) SetDefaults() {
 	o.Office365Settings.setDefaults()
 	o.GitLabSettings.setDefaults("", "", "", "", "")
 	o.GoogleSettings.setDefaults(GoogleSettingsDefaultScope, GoogleSettingsDefaultAuthEndpoint, GoogleSettingsDefaultTokenEndpoint, GoogleSettingsDefaultUserAPIEndpoint, "")
-	o.OpenIdSettings.setDefaults(OpenidSettingsDefaultScope, "", "", "", "#145DBF")
+	o.OpenIdSettings.SetDefaults()
 	o.ServiceSettings.SetDefaults(isUpdate)
 	o.PasswordSettings.SetDefaults()
 	o.TeamSettings.SetDefaults()
@@ -4482,6 +4482,14 @@ func (o *Config) IsValid() *AppError {
 
 	// Validate IntuneSettings
 	if appErr := o.IntuneSettings.IsValid(); appErr != nil {
+		return appErr
+	}
+
+	siteURL := ""
+	if o.ServiceSettings.SiteURL != nil {
+		siteURL = *o.ServiceSettings.SiteURL
+	}
+	if appErr := o.OpenIdSettings.IsValid(siteURL); appErr != nil {
 		return appErr
 	}
 

@@ -113,6 +113,7 @@ type Server struct {
 	EmailService email.ServiceInterface
 
 	httpService            httpservice.HTTPService
+	oidcManager            *OIDCManager
 	PushNotificationsHub   PushNotificationsHub
 	pushNotificationClient *http.Client // TODO: move this to it's own package
 	outgoingWebhookClient  *http.Client
@@ -230,6 +231,13 @@ func NewServer(options ...Option) (*Server, error) {
 	s.Router = s.RootRouter.PathPrefix(subpath).Subrouter()
 
 	s.httpService = httpservice.MakeHTTPService(s.platform)
+	s.oidcManager = NewOIDCManager(s.httpService)
+	s.oidcManager.Reload(s.platform.Config())
+	s.platform.AddConfigListener(func(_, newCfg *model.Config) {
+		if s.oidcManager != nil {
+			s.oidcManager.Reload(newCfg)
+		}
+	})
 
 	// Step 2: Init Enterprise
 	// Depends on step 1 (s.Platform must be non-nil)

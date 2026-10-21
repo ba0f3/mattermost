@@ -45,6 +45,7 @@ type TimerLayer struct {
 	LinkMetadataStore               store.LinkMetadataStore
 	NotifyAdminStore                store.NotifyAdminStore
 	OAuthStore                      store.OAuthStore
+	OIDCIdentityStore               store.OIDCIdentityStore
 	OutgoingOAuthConnectionStore    store.OutgoingOAuthConnectionStore
 	PluginStore                     store.PluginStore
 	PostStore                       store.PostStore
@@ -189,6 +190,10 @@ func (s *TimerLayer) NotifyAdmin() store.NotifyAdminStore {
 
 func (s *TimerLayer) OAuth() store.OAuthStore {
 	return s.OAuthStore
+}
+
+func (s *TimerLayer) OIDCIdentity() store.OIDCIdentityStore {
+	return s.OIDCIdentityStore
 }
 
 func (s *TimerLayer) OutgoingOAuthConnection() store.OutgoingOAuthConnectionStore {
@@ -467,6 +472,11 @@ type TimerLayerNotifyAdminStore struct {
 
 type TimerLayerOAuthStore struct {
 	store.OAuthStore
+	Root *TimerLayer
+}
+
+type TimerLayerOIDCIdentityStore struct {
+	store.OIDCIdentityStore
 	Root *TimerLayer
 }
 
@@ -7006,6 +7016,70 @@ func (s *TimerLayerOAuthStore) UpdateApp(app *model.OAuthApp) (*model.OAuthApp, 
 			success = "true"
 		}
 		s.Root.Metrics.ObserveStoreMethodDuration("OAuthStore.UpdateApp", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerOIDCIdentityStore) DeleteForUser(rctx request.CTX, userID string) error {
+	start := time.Now()
+
+	err := s.OIDCIdentityStore.DeleteForUser(rctx, userID)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("OIDCIdentityStore.DeleteForUser", success, elapsed)
+	}
+	return err
+}
+
+func (s *TimerLayerOIDCIdentityStore) Ensure(rctx request.CTX, identity *model.OIDCIdentity) error {
+	start := time.Now()
+
+	err := s.OIDCIdentityStore.Ensure(rctx, identity)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("OIDCIdentityStore.Ensure", success, elapsed)
+	}
+	return err
+}
+
+func (s *TimerLayerOIDCIdentityStore) Get(rctx request.CTX, identityKey string) (*model.OIDCIdentity, error) {
+	start := time.Now()
+
+	result, err := s.OIDCIdentityStore.Get(rctx, identityKey)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("OIDCIdentityStore.Get", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerOIDCIdentityStore) GetForUser(rctx request.CTX, userID string) (*model.OIDCIdentity, error) {
+	start := time.Now()
+
+	result, err := s.OIDCIdentityStore.GetForUser(rctx, userID)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("OIDCIdentityStore.GetForUser", success, elapsed)
 	}
 	return result, err
 }
@@ -13947,6 +14021,22 @@ func (s *TimerLayerTokenStore) GetByToken(token string) (*model.Token, error) {
 	return result, err
 }
 
+func (s *TimerLayerTokenStore) GetByTokenFromMaster(token string) (*model.Token, error) {
+	start := time.Now()
+
+	result, err := s.TokenStore.GetByTokenFromMaster(token)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("TokenStore.GetByTokenFromMaster", success, elapsed)
+	}
+	return result, err
+}
+
 func (s *TimerLayerTokenStore) GetTokenByTypeAndEmail(tokenType string, email string) (*model.Token, error) {
 	start := time.Now()
 
@@ -16486,6 +16576,7 @@ func New(childStore store.Store, metrics einterfaces.MetricsInterface) *TimerLay
 	newStore.LinkMetadataStore = &TimerLayerLinkMetadataStore{LinkMetadataStore: childStore.LinkMetadata(), Root: &newStore}
 	newStore.NotifyAdminStore = &TimerLayerNotifyAdminStore{NotifyAdminStore: childStore.NotifyAdmin(), Root: &newStore}
 	newStore.OAuthStore = &TimerLayerOAuthStore{OAuthStore: childStore.OAuth(), Root: &newStore}
+	newStore.OIDCIdentityStore = &TimerLayerOIDCIdentityStore{OIDCIdentityStore: childStore.OIDCIdentity(), Root: &newStore}
 	newStore.OutgoingOAuthConnectionStore = &TimerLayerOutgoingOAuthConnectionStore{OutgoingOAuthConnectionStore: childStore.OutgoingOAuthConnection(), Root: &newStore}
 	newStore.PluginStore = &TimerLayerPluginStore{PluginStore: childStore.Plugin(), Root: &newStore}
 	newStore.PostStore = &TimerLayerPostStore{PostStore: childStore.Post(), Root: &newStore}
