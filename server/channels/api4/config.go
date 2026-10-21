@@ -14,6 +14,7 @@ import (
 	"github.com/mattermost/mattermost/server/public/model"
 	"github.com/mattermost/mattermost/server/public/shared/i18n"
 	"github.com/mattermost/mattermost/server/public/shared/mlog"
+	"github.com/mattermost/mattermost/server/v8/channels/app/oidcmobile"
 	"github.com/mattermost/mattermost/server/v8/channels/utils"
 	"github.com/mattermost/mattermost/server/v8/config"
 )
@@ -256,6 +257,24 @@ func getClientConfig(c *Context, w http.ResponseWriter, r *http.Request) {
 		config = c.App.Srv().Platform().LimitedClientConfigWithComputed()
 	} else {
 		config = c.App.Srv().Platform().ClientConfigWithComputed()
+	}
+
+	// This response depends on the client and the current plugin runtime state.
+	// Never let a shared cache reuse the mobile login button for web clients.
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Add("Vary", "User-Agent")
+	if oidcmobile.IsMobileUserAgent(r.UserAgent()) {
+		pluginConfig := c.App.GetMobileOIDCPluginConfig()
+		if pluginConfig.Enabled && pluginConfig.Available {
+			// The WithComputed methods return request-local copies of the config.
+			config["EnableSignUpWithOpenId"] = "true"
+			if pluginConfig.ButtonText != "" {
+				config["OpenIdButtonText"] = pluginConfig.ButtonText
+			}
+			if pluginConfig.ButtonColor != "" {
+				config["OpenIdButtonColor"] = pluginConfig.ButtonColor
+			}
+		}
 	}
 
 	if err := json.NewEncoder(w).Encode(config); err != nil {

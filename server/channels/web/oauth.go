@@ -509,6 +509,17 @@ func mobileLoginWithOAuth(c *Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The native app uses this core route even when OIDC is provided by a
+	// plugin. Dispatch before the built-in provider lookup and HTML escaping:
+	// the plugin must receive the original callback, including its query.
+	if c.Params.Service == model.ServiceOpenid {
+		pluginConfig := c.App.GetMobileOIDCPluginConfig()
+		if pluginConfig.Enabled {
+			mobileLoginWithOIDCPlugin(c, w, r, pluginConfig)
+			return
+		}
+	}
+
 	redirectURL := html.EscapeString(r.URL.Query().Get("redirect_to"))
 
 	if redirectURL != "" && !utils.IsValidMobileAuthRedirectURL(c.App.Config(), redirectURL) {
