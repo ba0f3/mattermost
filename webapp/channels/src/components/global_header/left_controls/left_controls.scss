@@ -58,6 +58,12 @@ $menuWidth: 240px;
             }
         }
 
+        &-customLogo {
+            max-width: 116px;
+            height: 20px;
+            object-fit: contain;
+        }
+
         &-licensedEdition {
             display: flex;
             align-items: center;
