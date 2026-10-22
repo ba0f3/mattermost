@@ -44,7 +44,7 @@ describe('ProductBranding', () => {
         jest.restoreAllMocks();
     });
 
-    test('should render TEAM EDITION for unlicensed users', () => {
+    test('should not render TEAM EDITION for unlicensed users', () => {
         const state = {
             entities: {
                 general: {
@@ -58,10 +58,10 @@ describe('ProductBranding', () => {
 
         renderWithContext(<ProductBranding/>, state);
 
-        expect(screen.getByText('TEAM EDITION')).toBeInTheDocument();
+        expect(screen.queryByText('TEAM EDITION')).not.toBeInTheDocument();
     });
 
-    test('should render ENTRY EDITION for Entry license', () => {
+    test('should not render ENTRY EDITION for Entry license', () => {
         const state = {
             entities: {
                 general: {
@@ -75,7 +75,7 @@ describe('ProductBranding', () => {
 
         renderWithContext(<ProductBranding/>, state);
 
-        expect(screen.getByText('ENTRY EDITION')).toBeInTheDocument();
+        expect(screen.queryByText('ENTRY EDITION')).not.toBeInTheDocument();
     });
 
     test('should not render a license name for a licensed edition that is not Entry', () => {
