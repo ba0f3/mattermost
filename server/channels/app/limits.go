@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	maxUsersLimit     = 200
-	maxUsersHardLimit = 250
+	// Free-tier seat limits raised to effectively unlimited (mostlymatter limitless.patch).
+	maxUsersLimit     = 5_000_000
+	maxUsersHardLimit = 11_000_000
 )
 
 // GetServerLimits returns the server's seat/post-history limits. The license-derived
