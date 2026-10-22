@@ -114,7 +114,8 @@ export function splitFormattingBarControls(
         visibleControlsCount = Math.max(0, visibleControlsCount - 3);
     }
 
-    const sourceControls = showTextStyleDropdown ? ALL_CONTROLS.filter((c) => c !== 'heading') : ALL_CONTROLS;
+    const availableControls: MarkdownMode[] = hasTextStyleDropdown ? ['bold', 'italic', 'underline', ...ALL_CONTROLS.slice(2)] : ALL_CONTROLS;
+    const sourceControls = showTextStyleDropdown ? availableControls.filter((c) => c !== 'heading') : availableControls;
 
     const controls = sourceControls.slice(0, visibleControlsCount);
     const hiddenControls = sourceControls.slice(visibleControlsCount);

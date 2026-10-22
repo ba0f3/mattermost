@@ -1983,6 +1983,14 @@
 
 .post-message__text {
     text-align: left;
+
+    // Keep prose readable on wide screens without constraining code or tables.
+    > p,
+    > ul,
+    > ol,
+    > blockquote {
+        max-width: 80ch;
+    }
 }
 
 .view-history__text {

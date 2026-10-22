@@ -78,7 +78,7 @@ const WysiwygEditorSection: React.FC<Props> = ({active, areAllSectionsInactive, 
                 option: 'false',
                 inputId: 'wysiwygEditorMarkdown',
                 messageId: 'user.settings.display.wysiwygEditor.markdown',
-                defaultMessage: 'Markdown editing (default)',
+                defaultMessage: 'Markdown editing',
             },
             {
                 option: 'true',
@@ -158,7 +158,7 @@ const WysiwygEditorSection: React.FC<Props> = ({active, areAllSectionsInactive, 
                 ) : (
                     <FormattedMessage
                         id='user.settings.display.wysiwygEditor.markdown'
-                        defaultMessage='Markdown editing (default)'
+                        defaultMessage='Markdown editing'
                     />
                 )
             }

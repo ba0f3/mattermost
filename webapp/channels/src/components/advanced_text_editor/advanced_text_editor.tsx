@@ -186,7 +186,7 @@ const AdvancedTextEditor = ({
     const fullWidthTextBox = useSelector((state: GlobalState) => get(state, Preferences.CATEGORY_DISPLAY_SETTINGS, Preferences.CHANNEL_DISPLAY_MODE, Preferences.CHANNEL_DISPLAY_MODE_DEFAULT) === Preferences.CHANNEL_DISPLAY_MODE_FULL_SCREEN);
     const isFormattingBarHidden = useSelector((state: GlobalState) => {
         const preferenceName = getFormattingBarPreferenceName();
-        return getBool(state, Preferences.ADVANCED_TEXT_EDITOR, preferenceName);
+        return getBool(state, Preferences.ADVANCED_TEXT_EDITOR, preferenceName, true);
     });
     const teammateId = useSelector((state: GlobalState) => getDirectChannel(state, channelId)?.teammate_id || '');
     const teammateDisplayName = useSelector((state: GlobalState) => (teammateId ? getDisplayName(state, teammateId) : ''));
@@ -844,6 +844,7 @@ const AdvancedTextEditor = ({
         );
     }, [isInEditMode, isRHS]);
 
+    const inlineComposer = !showFormattingBar && !showPreview && !attachmentPreview && !priorityLabels && !burnOnReadLabels;
     const showFormattingSpacer = isMessageLong || showPreview || attachmentPreview || isRHS || isThreadView;
 
     const containsAtMentionsInMessage = allAtMentions(draft?.message)?.length > 0;
@@ -899,7 +900,7 @@ const AdvancedTextEditor = ({
                         data-a11y-sort-order='2'
                         aria-label={ariaLabel}
                         tabIndex={-1}
-                        className='AdvancedTextEditor__cell a11y__region'
+                        className={classNames('AdvancedTextEditor__cell a11y__region', {'inline-composer': inlineComposer})}
                     >
                         {!isInEditMode && (priorityLabels || burnOnReadLabels) && (
                             <div className='AdvancedTextEditor__labels'>
@@ -964,16 +965,18 @@ const AdvancedTextEditor = ({
                                 {showFormatJSX}
                             </TexteditorActions>
                         )}
-                        {showFormattingSpacer ? (
+                        {!inlineComposer && (showFormattingSpacer ? (
                             <FormattingBarSpacer>
                                 {formattingBar}
                             </FormattingBarSpacer>
-                        ) : formattingBar}
+                        ) : formattingBar)}
                         {!isDisabled && (
                             <TexteditorActions
                                 ref={editorActionsRef}
+                                $inline={inlineComposer}
                                 placement='bottom'
                             >
+                                {!showFormattingBar && aiActionsMenu}
                                 <ToggleFormattingBar
                                     onClick={toggleAdvanceTextEditor}
                                     active={showFormattingBar}

@@ -73,7 +73,7 @@ export type SuggestionListProps = {
     };
 };
 
-export type PublishedMarkdownMode = 'bold' | 'italic' | 'link' | 'strike' | 'code' | 'heading' | 'quote' | 'ul' | 'ol';
+export type PublishedMarkdownMode = 'bold' | 'underline' | 'italic' | 'link' | 'strike' | 'code' | 'heading' | 'quote' | 'ul' | 'ol';
 
 export type FormattingBarProps = {
     applyFormatting: (mode: PublishedMarkdownMode) => void;

@@ -6,6 +6,7 @@ import styled, {css} from 'styled-components';
 
 type TexteditorActionsProps = {
     placement: 'top' | 'bottom';
+    $inline?: boolean;
     show?: boolean;
     isScrollbarRendered?: boolean;
 };
@@ -25,6 +26,17 @@ const TexteditorActions = styled.span<TexteditorActionsProps>`
         right: 7px;
         bottom: 7px;
     `)}
+
+    ${({$inline}) => $inline && css`
+        position: static;
+        flex-shrink: 0;
+        margin-right: 12px;
+
+        @media screen and (max-width: 768px) {
+            align-self: flex-end;
+            margin-bottom: 8px;
+        }
+    `}
 
     opacity: ${({show = true}) => (show ? 1 : 0)};
     transition: opacity 0.3s linear;

@@ -950,4 +950,33 @@ describe('shouldShowUnreadsCategory', () => {
 
         expect(Selectors.shouldShowUnreadsCategory(state)).toBe(true);
     });
+    describe('getWysiwygEditorPreference', () => {
+        const makeState = (flag: string, value?: string) => ({
+            entities: {
+                general: {config: {FeatureFlagWysiwygEditor: flag}},
+                preferences: {
+                    myPreferences: value === undefined ? {} : {
+                        [getPreferenceKey(Preferences.CATEGORY_DISPLAY_SETTINGS, Preferences.WYSIWYG_EDITOR)]: {
+                            category: Preferences.CATEGORY_DISPLAY_SETTINGS,
+                            name: Preferences.WYSIWYG_EDITOR,
+                            user_id: 'currentuserid',
+                            value,
+                        },
+                    },
+                },
+            },
+        } as unknown as GlobalState);
+
+        test('uses rich text by default when available', () => {
+            expect(Selectors.getWysiwygEditorPreference(makeState('true'))).toBe(true);
+        });
+
+        test('keeps an explicit choice of plain Markdown', () => {
+            expect(Selectors.getWysiwygEditorPreference(makeState('true', 'false'))).toBe(false);
+        });
+
+        test('respects the server feature switch', () => {
+            expect(Selectors.getWysiwygEditorPreference(makeState('false', 'true'))).toBe(false);
+        });
+    });
 });

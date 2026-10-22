@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-export type MarkdownMode = 'bold' | 'italic' | 'link' | 'strike' | 'code' | 'heading' | 'quote' | 'ul' | 'ol';
+export type MarkdownMode = 'bold' | 'underline' | 'italic' | 'link' | 'strike' | 'code' | 'heading' | 'quote' | 'ul' | 'ol';
 
 export type ApplyMarkdownOptions = {
     markdownMode: MarkdownMode;
@@ -56,6 +56,8 @@ export function applyMarkdown(options: ApplyMarkdownOptions): ApplyMarkdownRetur
     switch (markdownMode) {
     case 'bold':
         return applyBoldMarkdown({selectionEnd, selectionStart, message});
+    case 'underline':
+        return applyMarkdownToSelection({selectionEnd, selectionStart, message, delimiterStart: '<u>', delimiterEnd: '</u>'});
     case 'italic':
         return applyItalicMarkdown({selectionEnd, selectionStart, message});
     case 'link':

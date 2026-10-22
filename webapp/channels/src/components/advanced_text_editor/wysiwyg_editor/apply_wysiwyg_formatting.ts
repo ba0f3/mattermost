@@ -8,7 +8,7 @@ import type {MarkdownMode} from 'utils/markdown/apply_markdown';
 const isWordChar = (/\S/);
 
 export const applyWysiwygFormatting = (editor: Editor, mode: MarkdownMode) => {
-    const isInlineMark = mode === 'bold' || mode === 'italic' || mode === 'strike';
+    const isInlineMark = mode === 'underline' || mode === 'bold' || mode === 'italic' || mode === 'strike';
     let caret: number | undefined;
     if (isInlineMark && editor.state.selection.empty) {
         const $from = editor.state.selection.$from;
@@ -33,6 +33,9 @@ export const applyWysiwygFormatting = (editor: Editor, mode: MarkdownMode) => {
     switch (mode) {
     case 'bold':
         chain.toggleBold().run();
+        break;
+    case 'underline':
+        chain.toggleUnderline().run();
         break;
     case 'italic':
         chain.toggleItalic().run();

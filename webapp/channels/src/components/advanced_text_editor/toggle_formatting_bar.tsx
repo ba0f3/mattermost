@@ -21,7 +21,6 @@ const ToggleFormattingBar = (props: ToggleFormattingBarProps): JSX.Element => {
     const {onClick, active, disabled} = props;
     const {formatMessage} = useIntl();
     const buttonAriaLabel = formatMessage({id: 'accessibility.button.formatting', defaultMessage: 'formatting'});
-    const iconAriaLabel = formatMessage({id: 'generic_icons.format_letter_case', defaultMessage: 'Format letter Case Icon'});
 
     const title = active ? (
         <KeyboardShortcutSequence
@@ -49,16 +48,17 @@ const ToggleFormattingBar = (props: ToggleFormattingBarProps): JSX.Element => {
                 onClick={onClick}
                 disabled={disabled}
                 aria-label={buttonAriaLabel}
+                aria-expanded={active}
             >
                 <FormatLetterCaseIcon
                     size={18}
                     color={'currentColor'}
-                    aria-label={iconAriaLabel}
+                    aria-hidden={true}
                 />
                 <ChevronIcon
                     size={12}
                     color={'currentColor'}
-                    aria-label={iconAriaLabel}
+                    aria-hidden={true}
                 />
             </IconContainer>
         </WithTooltip>

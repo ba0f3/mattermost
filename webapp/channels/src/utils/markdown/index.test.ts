@@ -1,9 +1,20 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {format} from './index';
+import {format, stripMarkdown} from './index';
 
 describe('format', () => {
+    test('renders bare underline tags and strips them from plain text', () => {
+        expect(format('<u>hello **world**</u>')).toContain('<u>hello <strong>world</strong></u>');
+        expect(stripMarkdown('<u>hello</u>')).toBe('hello');
+    });
+
+    test('does not allow attributes on underline tags or execute other HTML', () => {
+        expect(format('<u onclick="alert(1)">hello</u>')).not.toContain('<u onclick=');
+        expect(format('<script>alert(1)</script>')).not.toContain('<script>');
+        expect(format('`<u>hello</u>`')).not.toContain('<u>hello</u>');
+    });
+
     const htmlOutput = '<div data-codeblock-code="{code}" data-codeblock-language="{language}" data-codeblock-searchedcontent=""></div>';
 
     test('should return valid div for html to component transformation', () => {

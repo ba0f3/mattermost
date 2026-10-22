@@ -10,6 +10,7 @@ import {Table} from '@tiptap/extension-table';
 import {TableCell} from '@tiptap/extension-table-cell';
 import {TableHeader} from '@tiptap/extension-table-header';
 import {TableRow} from '@tiptap/extension-table-row';
+import Underline from '@tiptap/extension-underline';
 import {Markdown} from '@tiptap/markdown';
 import type {Node as PMNode} from '@tiptap/pm/model';
 import {splitListItem} from '@tiptap/pm/schema-list';
@@ -78,7 +79,7 @@ function buildEmojiDecorations(doc: PMNode): DecorationSet {
         }
         const matcher = emojiRegex();
         let match;
-        // eslint-disable-next-line no-cond-assign
+
         while ((match = matcher.exec(node.text)) !== null) {
             const from = pos + match.index;
             const to = from + match[0].length;
@@ -264,9 +265,15 @@ const WysiwygEditor = forwardRef<WysiwygEditorHandle, Props>(({
         StarterKit.configure({
             heading: {levels: [1, 2, 3, 4, 5, 6], HTMLAttributes: {class: 'markdown__heading'}},
             codeBlock: false,
+            underline: false,
             link: false,
             bulletList: {HTMLAttributes: {class: 'markdown__list'}},
             orderedList: {HTMLAttributes: {class: 'markdown__list'}},
+        }),
+        Underline.extend({
+            renderMarkdown(node, helpers) {
+                return `<u>${helpers.renderChildren(node)}</u>`;
+            },
         }),
         CodeBlockLowlight.configure({
             lowlight,

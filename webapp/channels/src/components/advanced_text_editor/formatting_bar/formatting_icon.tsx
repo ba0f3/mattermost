@@ -38,7 +38,7 @@ export const IconContainer = styled.button`
     border: none;
     background: transparent;
     padding: 0 7px;
-    border-radius: 4px;
+    border-radius: var(--radius-s);
     color: rgba(var(--center-channel-color-rgb), var(--icon-opacity));
 
     &:hover {
@@ -53,6 +53,11 @@ export const IconContainer = styled.button`
         background: rgba(var(--button-bg-rgb), 0.08);
         color: var(--button-bg);
         fill: currentColor;
+    }
+
+    @media screen and (max-width: 768px) {
+        min-width: 44px;
+        height: 44px;
     }
 
     &[disabled] {
@@ -80,8 +85,25 @@ interface FormattingIconProps {
     isActive?: boolean;
 }
 
+// Compass does not yet include an underline glyph.
+const UnderlineIcon: React.FC<IconProps> = ({size = 18, color = 'currentColor'}) => (
+    <svg
+        width={size}
+        height={size}
+        viewBox='0 0 24 24'
+        fill='none'
+        stroke={color}
+        strokeWidth='2'
+        strokeLinecap='round'
+        aria-hidden={true}
+    >
+        <path d='M7 4v7a5 5 0 0 0 10 0V4M5 21h14'/>
+    </svg>
+);
+
 const MAP_MARKDOWN_MODE_TO_ICON: Record<FormattingIconProps['mode'], React.FC<IconProps>> = {
     bold: FormatBoldIcon,
+    underline: UnderlineIcon,
     italic: FormatItalicIcon,
     link: LinkVariantIcon,
     strike: FormatStrikethroughVariantIcon,
@@ -93,6 +115,7 @@ const MAP_MARKDOWN_MODE_TO_ICON: Record<FormattingIconProps['mode'], React.FC<Ic
 };
 
 const MAP_MARKDOWN_MODE_TO_ARIA_LABEL: Record<FormattingIconProps['mode'], MessageDescriptor> = defineMessages({
+    underline: {id: 'accessibility.button.underline', defaultMessage: 'underline'},
     bold: {id: 'accessibility.button.bold', defaultMessage: 'bold'},
     italic: {id: 'accessibility.button.italic', defaultMessage: 'italic'},
     link: {id: 'accessibility.button.link', defaultMessage: 'link'},
@@ -104,7 +127,7 @@ const MAP_MARKDOWN_MODE_TO_ARIA_LABEL: Record<FormattingIconProps['mode'], Messa
     ol: {id: 'accessibility.button.numbered_list', defaultMessage: 'numbered list'},
 });
 
-const MAP_MARKDOWN_MODE_TO_KEYBOARD_SHORTCUTS: Record<FormattingIconProps['mode'], KeyboardShortcutDescriptor> = {
+const MAP_MARKDOWN_MODE_TO_KEYBOARD_SHORTCUTS: Partial<Record<FormattingIconProps['mode'], KeyboardShortcutDescriptor>> = {
     bold: KEYBOARD_SHORTCUTS.msgMarkdownBold,
     italic: KEYBOARD_SHORTCUTS.msgMarkdownItalic,
     link: KEYBOARD_SHORTCUTS.msgMarkdownLink,
@@ -156,13 +179,13 @@ const FormattingIcon = forwardRef<HTMLButtonElement, FormattingIconProps>((props
 
     return (
         <WithTooltip
-            title={
+            title={shortcut ? (
                 <KeyboardShortcutSequence
                     shortcut={shortcut}
                     hoistDescription={true}
                     isInsideTooltip={true}
                 />
-            }
+            ) : buttonAriaLabel}
         >
             {bodyAction}
         </WithTooltip>

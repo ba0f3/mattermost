@@ -29,7 +29,12 @@ export const Separator = styled.div.attrs({'data-testid': 'formatting-bar-separa
 
 export const FormattingBarSpacer = styled.div`
     display: flex;
-    height: 48px;
+    min-height: 48px;
+
+    @media screen and (max-width: 768px) {
+        min-height: 56px;
+    }
+
     transition: height 0.25s ease;
     align-items: end;
     background: var(--center-channel-bg);
@@ -46,6 +51,12 @@ const FormattingBarContainer = styled.div`
     transition: height 0.25s ease;
     overflow: hidden;
     flex-wrap: nowrap;
+
+    @media screen and (max-width: 768px) {
+        height: 104px;
+        align-items: flex-start;
+        padding-top: 8px;
+    }
 `;
 
 const HiddenControlsContainer = styled.div`
@@ -144,6 +155,7 @@ const DEFAULT_MIN_MODE_X_COORD = 55;
 
 const WYSIWYG_NODE_FOR_MODE: Partial<Record<MarkdownMode, string>> = {
     bold: 'bold',
+    underline: 'underline',
     italic: 'italic',
     strike: 'strike',
     code: 'codeBlock',
@@ -168,7 +180,7 @@ function computeActiveModes(editor: Editor | null, modes: MarkdownMode[]): Parti
     return result;
 }
 
-const ALL_FORMATTING_MODES: MarkdownMode[] = ['bold', 'italic', 'strike', 'heading', 'link', 'code', 'quote', 'ul', 'ol'];
+const ALL_FORMATTING_MODES: MarkdownMode[] = ['bold', 'italic', 'underline', 'strike', 'heading', 'link', 'code', 'quote', 'ul', 'ol'];
 
 const FormattingBar = forwardRef<FormattingBarHandle, FormattingBarProps>((props, ref) => {
     const {

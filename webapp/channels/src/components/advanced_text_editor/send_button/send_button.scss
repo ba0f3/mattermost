@@ -69,4 +69,16 @@
             background: color-mix(in srgb, var(--button-bg) 90%, #000);
         }
     }
+    @media screen and (max-width: 768px) {
+        height: 44px;
+
+        .button_send_post_options {
+            width: 44px;
+        }
+
+        &.scheduledPost {
+            width: 88px;
+        }
+    }
+
 }

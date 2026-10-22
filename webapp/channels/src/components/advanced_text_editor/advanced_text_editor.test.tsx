@@ -16,7 +16,7 @@ import type Textbox from 'components/textbox/textbox';
 
 import mergeObjects from 'packages/mattermost-redux/test/merge_objects';
 import {renderWithContext, userEvent, screen, act, createEvent, fireEvent} from 'tests/react_testing_utils';
-import Constants, {Locations, PostTypes, StoragePrefixes} from 'utils/constants';
+import Constants, {Locations, PostTypes, Preferences, StoragePrefixes} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
 
 import type {PostDraft} from 'types/store/draft';
@@ -205,8 +205,65 @@ const baseProps = {
 };
 
 describe('components/avanced_text_editor/advanced_text_editor', () => {
+    beforeAll(() => {
+        document.elementFromPoint = () => null;
+    });
+
     afterEach(() => {
         jest.useRealTimers();
+    });
+
+    it('uses inline rich text without a preview toggle by default when enabled', () => {
+        renderWithContext(<AdvancedTextEditor {...baseProps}/>, mergeObjects(initialState, {
+            entities: {
+                general: {config: {FeatureFlagWysiwygEditor: 'true'}},
+                preferences: {
+                    myPreferences: {
+                        [`${Preferences.ADVANCED_TEXT_EDITOR}--post`]: {
+                            user_id: currentUserId,
+                            category: Preferences.ADVANCED_TEXT_EDITOR,
+                            name: 'post',
+                            value: 'false',
+                        },
+                    },
+                },
+            },
+        }));
+
+        expect(screen.getByRole('textbox')).toHaveAttribute('contenteditable', 'true');
+        expect(screen.getByRole('button', {name: 'bold'})).toBeVisible();
+        expect(screen.queryByRole('button', {name: 'preview'})).not.toBeInTheDocument();
+    });
+
+    it('starts with formatting collapsed when no preference is saved', () => {
+        renderWithContext(<AdvancedTextEditor {...baseProps}/>, initialState);
+
+        expect(screen.getByRole('button', {name: 'formatting'})).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('button', {name: 'bold'})).not.toBeInTheDocument();
+    });
+
+    it.each(['true', 'false'])('respects a saved formatting visibility preference of %s', (value) => {
+        renderWithContext(<AdvancedTextEditor {...baseProps}/>, mergeObjects(initialState, {
+            entities: {
+                preferences: {
+                    myPreferences: {
+                        [`${Preferences.ADVANCED_TEXT_EDITOR}--post`]: {
+                            user_id: currentUserId,
+                            category: Preferences.ADVANCED_TEXT_EDITOR,
+                            name: 'post',
+                            value,
+                        },
+                    },
+                },
+            },
+        }));
+
+        expect(screen.getByRole('button', {name: 'formatting'})).toHaveAttribute('aria-expanded', String(value === 'false'));
+        if (value === 'false') {
+            expect(screen.getByRole('button', {name: 'bold'})).toBeVisible();
+        } else {
+            expect(screen.queryByRole('button', {name: 'bold'})).not.toBeInTheDocument();
+        }
     });
 
     describe('keyDown behavior', () => {

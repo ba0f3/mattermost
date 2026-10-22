@@ -7,6 +7,7 @@ import React from 'react';
 
 import {renderWithContext} from 'tests/react_testing_utils';
 
+import {applyWysiwygFormatting} from './apply_wysiwyg_formatting';
 import WysiwygEditor from './wysiwyg_editor';
 import type {WysiwygEditorHandle} from './wysiwyg_editor';
 import {serializeToMarkdown} from './wysiwyg_markdown';
@@ -66,6 +67,24 @@ describe('WysiwygEditor interactions', () => {
         );
         return {...utils, ref, editor: ref.current!.getEditor()!};
     };
+
+    test('underline survives Markdown serialization and reopening for editing', () => {
+        const {editor} = renderEditor('hello');
+        act(() => {
+            editor.commands.setTextSelection({from: 1, to: 6});
+            applyWysiwygFormatting(editor, 'underline');
+        });
+        expect(editor.getHTML()).toContain('<u>hello</u>');
+        const markdown = serializeToMarkdown(editor);
+        expect(markdown).toBe('<u>hello</u>');
+        const {editor: reopened} = renderEditor(markdown, 'c2');
+        expect(reopened.getHTML()).toContain('<u>hello</u>');
+        act(() => {
+            reopened.commands.setTextSelection({from: 1, to: 6});
+            applyWysiwygFormatting(reopened, 'underline');
+        });
+        expect(reopened.getHTML()).not.toContain('<u>');
+    });
 
     describe('Shift+Enter inside a quote', () => {
         test('starts a new quoted line', () => {

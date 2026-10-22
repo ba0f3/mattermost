@@ -10,7 +10,7 @@ import store from 'stores/redux_store';
 
 import type EmojiMap from 'utils/emoji_map';
 import RemoveMarkdown from 'utils/markdown/remove_markdown';
-import {convertEntityToCharacter} from 'utils/text_formatting';
+import {escapeHtml, convertEntityToCharacter} from 'utils/text_formatting';
 import {getScheme} from 'utils/url';
 
 import Renderer from './renderer';
@@ -29,6 +29,14 @@ export function formatWithRenderer(text: string, renderer: marked.Renderer) {
     const markdownOptions = {
         renderer,
         sanitize: true,
+
+        // Only bare underline tags are allowed; attributes and all other HTML stay escaped.
+        sanitizer: (html: string) => {
+            if ((/^<\/?u>$/i).test(html)) {
+                return renderer instanceof RemoveMarkdown ? '' : html;
+            }
+            return escapeHtml(html);
+        },
         gfm: true,
         tables: true,
         mangle: false,

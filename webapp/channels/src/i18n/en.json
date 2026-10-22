@@ -191,6 +191,10 @@
     "defaultMessage": "strike through",
     "description": "Accessibility label for the strikethrough formatting button in the message toolbar; lowercase by design."
   },
+  "accessibility.button.underline": {
+    "defaultMessage": "underline",
+    "description": "Accessible label and tooltip for the underline button in the rich text message editor."
+  },
   "accessibility.emoji_icon": {
     "defaultMessage": "Emoji icon",
     "description": "Screen-reader label for the smiley-face emoji icon shown on emoji picker, add-reaction and custom status buttons."
@@ -8482,10 +8486,6 @@
   "admin.ldap_feature_discovery_cloud.call_to_action.primary_sales": {
     "defaultMessage": "Contact sales",
     "description": "Primary button on feature discovery (upsell) pages; opens the Mattermost contact-sales form."
-  },
-  "admin.ldap_feature_discovery.call_to_action.primary": {
-    "defaultMessage": "Start trial",
-    "description": "Primary call-to-action button label that starts a free Enterprise trial; used on admin console feature discovery pages and in the 'Learn more about trial' modal."
   },
   "admin.ldap_feature_discovery.call_to_action.secondary": {
     "defaultMessage": "Learn more",
@@ -23391,10 +23391,6 @@
     "defaultMessage": "Saved Icon",
     "description": "Accessibility label for the saved-message (bookmark flag) icon; 'Saved' refers to the saved posts feature."
   },
-  "generic_icons.format_letter_case": {
-    "defaultMessage": "Format letter Case Icon",
-    "description": "Accessibility label for the letter-case ('Aa') icon on the formatting toolbar toggle button."
-  },
   "generic_icons.globe.circleSolid": {
     "defaultMessage": "Globe Circle Solid Icon",
     "description": "Accessibility title for a solid globe-in-circle icon (represents a public channel)."
@@ -32732,8 +32728,8 @@
     "description": "Title of the Display tab in the user Settings modal."
   },
   "user.settings.display.wysiwygEditor.markdown": {
-    "defaultMessage": "Markdown editing (default)",
-    "description": "Radio option for the message editor mode setting; plain markdown editing, marked as the default."
+    "defaultMessage": "Markdown editing",
+    "description": "Radio option for the message editor mode setting; plain markdown editing as an alternative to the default rich text editor."
   },
   "user.settings.display.wysiwygEditor.richText": {
     "defaultMessage": "Rich text editing (formatting appears as you type)",

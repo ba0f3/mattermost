@@ -196,7 +196,7 @@ func (f *FeatureFlags) SetDefaults() {
 	f.EnableSyncAllUsersForRemoteCluster = false
 	f.AppsEnabled = false
 	f.NormalizeLdapDNs = false
-	f.WysiwygEditor = false
+	f.WysiwygEditor = true
 	f.MoveThreadsEnabled = false
 	f.NotificationMonitoring = true
 	f.AttributeValueMasking = true

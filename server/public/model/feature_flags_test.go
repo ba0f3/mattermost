@@ -14,6 +14,11 @@ func TestFeatureFlagsSetDefaults(t *testing.T) {
 	f := &FeatureFlags{}
 	f.SetDefaults()
 
+	t.Run("WysiwygEditor defaults to true", func(t *testing.T) {
+		require.True(t, f.WysiwygEditor)
+		require.Equal(t, "true", f.ToMap()["WysiwygEditor"])
+	})
+
 	t.Run("ClassificationMarkings should default to true", func(t *testing.T) {
 		require.True(t, f.ClassificationMarkings)
 	})
