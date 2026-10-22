@@ -22,7 +22,6 @@ import ProductSwitcherChannelsMenuItem from './switch_product_channels_menuitem'
 import ProductSwitcherCloudLimitsFooter from './switch_product_cloud_limits_footer';
 import ProductSwitcherCloudTrialMenuItem from './switch_product_cloud_trial_menuitem';
 import ProductSwitcherDownloadMenuItem from './switch_product_download_menuitem';
-import ProductSwitcherEditionMenuItem from './switch_product_edition_menuitem';
 import ProductSwitcherIntegrationsMenuItem from './switch_product_integrations_menuitem';
 import ProductSwitcherMarketplaceMenuItem from './switch_product_marketplace_menuitem';
 import ProductSwitcherPluginMenuItems from './switch_product_plugin_menuitems';
@@ -141,7 +140,6 @@ export function SwitchProductMenu(props: Props) {
             />
             <ProductSwitcherDownloadMenuItem appDownloadLink={appDownloadLink}/>
             <ProductSwitcherAboutMenuItem siteName={siteName}/>
-            <ProductSwitcherEditionMenuItem/>
         </Menu.Container>
     );
 }
