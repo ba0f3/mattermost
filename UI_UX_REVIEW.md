@@ -94,7 +94,7 @@ Tiêu chí đánh giá: người mới tìm đúng kênh và gửi tin không c�
 
 Kiểm tra: 51 test đạt giữa bộ advanced text editor và theme utilities; ESLint không có lỗi (component editor có 3 cảnh báo sẵn có); Stylelint và git diff --check đạt. Orca xác nhận bản đang chạy dùng màu teal, composer desktop tối thiểu 86px, mobile 390×844 không tràn ngang và toolbar mở không chồng nút hành động. Chưa kiểm tra bàn phím ảo trên thiết bị thật.
 
-Các thay đổi navigation, rail tiện ích, bố cục chủ đề, nhãn tìm kiếm, bản dịch sai nghĩa và trình bày quyền AI vẫn nằm trong backlog; đợt đầu chưa xử lý các phần này.
+Các thay đổi navigation, rail tiện ích, bố cục chủ đề, nhãn tìm kiếm, trình bày quyền AI vẫn nằm trong backlog; đợt đầu chưa xử lý các phần này.
 
 ## Điều chỉnh căn giữa composer
 
@@ -109,3 +109,7 @@ Bản chạy đã được khởi động lại với mặc định mới. Orca 
 ## Nút gạch chân
 
 Thêm nút U cạnh B và I trong toolbar WYSIWYG, có nhãn tiếng Việt và trạng thái aria-pressed. Trên màn hẹp, định dạng này chuyển vào menu mở rộng cùng các nút còn lại. Gạch chân được lưu bằng thẻ u không có thuộc tính; phần hiển thị chỉ cho phép đúng thẻ mở và đóng này, mọi HTML khác vẫn được escape. Test kiểm tra lưu, mở lại, tắt gạch chân, hiển thị tin, bỏ định dạng trong plain text và không cho phép thuộc tính HTML. Orca xác nhận nút tạo chữ gạch chân và báo trạng thái đang bật; nội dung kiểm tra đã được xóa, không gửi tin.
+
+## Đã sửa thông báo tham gia và rời nhóm
+
+Sửa 20 chuỗi tiếng Việt của thông báo tham gia/rời kênh và nhóm, bao gồm một người, nhiều người, bản thân người xem và phần danh sách mở rộng. Các chuỗi joined_channel và joined_team không còn dịch thành rời nhóm. Giữ nguyên placeholder tên người dùng. Hai bộ test combined system message và last users đều đạt; Orca xác nhận các thông báo tham gia nhóm cũ hiển thị đúng sau tải lại.
