@@ -1,14 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React from 'react';
-import {useIntl} from 'react-intl';
-
-import {buttonClassNames} from '@mattermost/shared/components/button';
-
-import useOpenStartTrialFormModal from 'components/common/hooks/useOpenStartTrialFormModal';
-
-import './start_trial_btn.scss';
+import type {JSX} from 'react';
 
 export type StartTrialBtnProps = {
     onClick?: () => void;
@@ -21,49 +14,8 @@ export type StartTrialBtnProps = {
     renderAsButton?: false;
 });
 
-const StartTrialBtn = ({
-    btnClass = buttonClassNames({emphasis: 'primary'}),
-    onClick,
-    disabled = false,
-    renderAsButton = false,
-}: StartTrialBtnProps) => {
-    const {formatMessage} = useIntl();
-    const openTrialForm = useOpenStartTrialFormModal();
-    const startTrial = async () => {
-        // reading status from here instead of normal flow because
-        // by the time the function needs the updated value from requestLicense,
-        // it will be too late to wait for the render cycle to happen again
-        // to close over the updated value
-        openTrialForm();
-
-        // on click will execute whatever action is sent from the invoking place, if nothing is sent, open the trial benefits modal
-        if (onClick) {
-            onClick();
-        }
-    };
-
-    const id = 'start_trial_btn';
-
-    const btnText = formatMessage({id: 'admin.ldap_feature_discovery.call_to_action.primary', defaultMessage: 'Start trial'});
-
-    return renderAsButton ? (
-        <button
-            id={id}
-            className={btnClass}
-            onClick={startTrial}
-            disabled={disabled}
-        >
-            {btnText}
-        </button>
-    ) : (
-        <a
-            id={id}
-            className={buttonClassNames({emphasis: 'secondary'})}
-            onClick={startTrial}
-        >
-            {btnText}
-        </a>
-    );
-};
+// Start-trial CTAs are intentionally disabled in this build.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const StartTrialBtn = (_props: StartTrialBtnProps): JSX.Element | null => null;
 
 export default StartTrialBtn;

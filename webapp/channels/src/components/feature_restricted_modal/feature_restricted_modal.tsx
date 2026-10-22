@@ -125,8 +125,8 @@ const FeatureRestrictedModal = ({
         secondaryBtnAction = customSecondaryButton.action;
     }
 
-    // Hide view plans button for admins if air-gapped
-    const showSecondaryButton = !isAirGapped || !isSystemAdmin || customSecondaryButton;
+    // Hide the "View plans" CTA; only keep a caller-provided secondary button.
+    const showSecondaryButton = Boolean(customSecondaryButton);
 
     const trialBtn = (
         <StartTrialBtn

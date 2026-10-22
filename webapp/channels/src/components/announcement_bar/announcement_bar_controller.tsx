@@ -17,7 +17,6 @@ import NotificationPermissionBar from './notification_permission_bar';
 import OverageUsersBanner from './overage_users_banner';
 import PaymentAnnouncementBar from './payment_announcement_bar';
 import PostHistoryLimitBanner from './post_history_limit_banner';
-import AutoStartTrialModal from './show_start_trial_modal/show_start_trial_modal';
 import ShowThreeDaysLeftTrialModal from './show_tree_days_left_trial_modal/show_three_days_left_trial_modal';
 import SingleChannelGuestLimitBanner from './single_channel_guest_limit_banner';
 import TextDismissableBar from './text_dismissable_bar';
@@ -87,13 +86,6 @@ class AnnouncementBarController extends React.PureComponent<Props> {
             );
         }
 
-        let autoStartTrialModal = null;
-        if (this.props.userIsAdmin) {
-            autoStartTrialModal = (
-                <AutoStartTrialModal/>
-            );
-        }
-
         // The component specified further down takes priority over the component above it.
         // For example, consider this-
         // {
@@ -124,7 +116,6 @@ class AnnouncementBarController extends React.PureComponent<Props> {
                 {this.props.license?.Cloud !== 'true' && <OverageUsersBanner/>}
                 <SingleChannelGuestLimitBanner userIsAdmin={this.props.userIsAdmin}/>
                 <PostHistoryLimitBanner/>
-                {autoStartTrialModal}
                 <ShowThreeDaysLeftTrialModal/>
                 <VersionBar/>
                 <ConfigurationAnnouncementBar

@@ -302,16 +302,17 @@ const AdminDefinition: AdminDefinitionType = {
             />
         ),
         sectionTitle: defineMessage({id: 'admin.sidebar.about', defaultMessage: 'About'}),
-        isHidden: it.any(
-            it.configIsTrue('ExperimentalSettings', 'RestrictSystemAdmin'),
-            it.not(it.userHasReadPermissionOnSomeResources(RESOURCE_KEYS.ABOUT)),
-        ),
+
+        // The About section only contains Edition and License; upgrade UI is hidden in this build.
+        isHidden: it.any(true),
         subsections: {
             license: {
                 url: 'about/license',
                 title: defineMessage({id: 'admin.sidebar.license', defaultMessage: 'Edition and License'}),
                 searchableStrings: licenseSettingsSearchableStrings,
-                isHidden: it.not(it.userHasReadPermissionOnResource(RESOURCE_KEYS.ABOUT.EDITION_AND_LICENSE)),
+
+                // Upgrade UI is intentionally hidden in this build.
+                isHidden: it.any(true),
                 isDisabled: it.not(it.userHasWritePermissionOnResource(RESOURCE_KEYS.ABOUT.EDITION_AND_LICENSE)),
                 schema: {
                     id: 'LicenseSettings',
