@@ -13,8 +13,8 @@ services:
       - ALL
     pids_limit: 1024
     mem_limit: ${MATTERMOST_MEMORY_LIMIT:-4g}
-    ports:
-      - "${MATTERMOST_BIND_IP:-127.0.0.1}:${MATTERMOST_HTTP_PORT:-8065}:8065"
+    x-ports:
+      - ${MM_SERVICESETTINGS_DOMAIN:-portal.568int.com}:${MATTERMOST_HTTP_PORT:-8065}/https
     environment:
       TZ: ${TZ:-UTC}
       MM_SERVICESETTINGS_SITEURL: ${MM_SERVICESETTINGS_SITEURL:?Set the public HTTPS URL}
