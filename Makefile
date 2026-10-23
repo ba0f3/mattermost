@@ -45,7 +45,7 @@ WEB_DEV_URL := http://localhost:9005
 
 # Agents plugin source checkout used by `make plugin-install`.
 PLUGIN_DIR ?= ../mattermost-plugin-agents
-PLUGIN_GIT_URL ?= https://github.com/mattermost/mattermost-plugin-agents.git
+PLUGIN_GIT_URL ?= https://github.com/r2d-ai/mattermost-plugin-agents.git
 
 # watch: webpack --watch, assets served by the Go server (port 8065)
 # dev-server: webpack-dev-server with HMR (port 9005, proxies /api to 8065)
