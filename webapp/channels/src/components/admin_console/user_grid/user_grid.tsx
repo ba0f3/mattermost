@@ -37,6 +37,7 @@ type Props = {
     loading: boolean;
     term: string;
     readOnly?: boolean;
+    disableRemove?: boolean;
 
     filterProps: {
         options: FilterOptions;
@@ -221,7 +222,7 @@ export default class UserGrid extends React.PureComponent<Props, State> {
                         <UserGridRemove
                             user={user}
                             removeUser={this.removeUser}
-                            isDisabled={readOnly}
+                            isDisabled={readOnly || this.props.disableRemove}
                         />
                     ),
                 },

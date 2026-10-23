@@ -275,6 +275,7 @@ export default class ChannelMembers extends React.PureComponent<Props, State> {
                     term={searchTerm}
                     scope={'channel'}
                     readOnly={isDisabled}
+                    disableRemove={channel?.mandatory}
                     filterProps={filterProps}
                 />
             </AdminPanel>

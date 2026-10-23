@@ -3,7 +3,7 @@
 
 import {Permissions} from 'mattermost-redux/constants';
 import {getConfig} from 'mattermost-redux/selectors/entities/general';
-import {haveIChannelPermission, haveISystemPermission} from 'mattermost-redux/selectors/entities/roles';
+import {canManageChannelPostingAndMembership, haveIChannelPermission, haveISystemPermission} from 'mattermost-redux/selectors/entities/roles';
 
 import {getChannelSettingsTabs} from 'selectors/plugins';
 
@@ -87,5 +87,5 @@ export function canAccessChannelSettings(state: GlobalState, channelId: string):
     );
 
     // User can access channel settings if they have permission for at least one tab
-    return hasInfoPermission || hasBannerPermission || hasTranslationPermission || hasSharedChannelsPermission || hasArchivePermission || hasVisiblePluginTabs;
+    return canManageChannelPostingAndMembership(state, channelId) || hasInfoPermission || hasBannerPermission || hasTranslationPermission || hasSharedChannelsPermission || hasArchivePermission || hasVisiblePluginTabs;
 }

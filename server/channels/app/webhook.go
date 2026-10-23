@@ -526,6 +526,9 @@ func (a *App) CreateWebhookPost(rctx request.CTX, userID string, channel *model.
 		}
 		created, _, err := a.CreatePost(rctx, split, channel, flags)
 		if err != nil {
+			if err.StatusCode == http.StatusForbidden {
+				return nil, err
+			}
 			return nil, model.NewAppError("CreateWebhookPost", "api.post.create_webhook_post.creating.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 		}
 		if i == 0 {

@@ -1490,6 +1490,64 @@ func (_m *ChannelStore) GetGuestCount(channelID string, allowFromCache bool) (in
 	return r0, r1
 }
 
+// GetForPolicy provides a mock function with given fields: rctx, id
+func (_m *ChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
+	ret := _m.Called(rctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetForPolicy")
+	}
+
+	var r0 *model.Channel
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, string) (*model.Channel, error)); ok {
+		return rf(rctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, string) *model.Channel); ok {
+		r0 = rf(rctx, id)
+	} else if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*model.Channel)
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, string) error); ok {
+		r1 = rf(rctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetMandatoryChannels provides a mock function with given fields: teamID
+func (_m *ChannelStore) GetMandatoryChannels(teamID string) (model.ChannelList, error) {
+	ret := _m.Called(teamID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetMandatoryChannels")
+	}
+
+	var r0 model.ChannelList
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (model.ChannelList, error)); ok {
+		return rf(teamID)
+	}
+	if rf, ok := ret.Get(0).(func(string) model.ChannelList); ok {
+		r0 = rf(teamID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(model.ChannelList)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(teamID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetMany provides a mock function with given fields: ids, allowFromCache
 func (_m *ChannelStore) GetMany(ids []string, allowFromCache bool) (model.ChannelList, error) {
 	ret := _m.Called(ids, allowFromCache)

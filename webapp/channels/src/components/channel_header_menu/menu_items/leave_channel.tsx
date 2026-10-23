@@ -28,6 +28,10 @@ const LeaveChannel = ({
     id,
 }: Props) => {
     const dispatch = useDispatch();
+    if (channel.mandatory) {
+        return null;
+    }
+
     const handleLeave = () => {
         if (channel.type === Constants.PRIVATE_CHANNEL || channel.policy_enforced) {
             dispatch(

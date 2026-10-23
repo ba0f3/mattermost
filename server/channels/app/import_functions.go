@@ -1391,6 +1391,13 @@ func (a *App) importUserTeams(rctx request.CTX, user *model.User, data *[]import
 			return err
 		}
 	}
+	if user.DeleteAt == 0 {
+		for _, member := range append(newMembers, oldMembers...) {
+			if err := a.JoinMandatoryChannels(rctx, member.TeamId, user); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }

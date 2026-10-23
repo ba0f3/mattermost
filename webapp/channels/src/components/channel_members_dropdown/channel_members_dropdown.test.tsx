@@ -68,6 +68,18 @@ describe('components/channel_members_dropdown', () => {
         },
     };
 
+    test.each(['system_user', 'system_guest'])('hides removal from a mandatory channel for %s', (roles) => {
+        renderWithContext(
+            <ChannelMembersDropdown
+                {...baseProps}
+                channel={{...channel, mandatory: true}}
+                user={{...user, roles}}
+            />,
+        );
+        expect(screen.queryByTestId('removeFromChannel')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+
     test('should match snapshot for dropdown with guest user', () => {
         const props = {
             ...baseProps,

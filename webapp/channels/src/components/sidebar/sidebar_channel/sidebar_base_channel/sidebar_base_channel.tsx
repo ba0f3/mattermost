@@ -38,9 +38,9 @@ const SidebarBaseChannel = ({
     }, [channel, actions.openModal]);
 
     let channelLeaveHandler = null;
-    if (channel.type === Constants.OPEN_CHANNEL && channel.name !== Constants.DEFAULT_CHANNEL) {
+    if (!channel.mandatory && channel.type === Constants.OPEN_CHANNEL && channel.name !== Constants.DEFAULT_CHANNEL) {
         channelLeaveHandler = channel.policy_enforced ? handleLeaveWithConfirmation : handleLeavePublicChannel;
-    } else if (channel.type === Constants.PRIVATE_CHANNEL) {
+    } else if (!channel.mandatory && channel.type === Constants.PRIVATE_CHANNEL) {
         channelLeaveHandler = handleLeaveWithConfirmation;
     }
 

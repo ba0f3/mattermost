@@ -2158,6 +2158,22 @@ func (s *TimerLayerChannelStore) GetFileCount(channelID string) (int64, error) {
 	return result, err
 }
 
+func (s *TimerLayerChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetForPolicy(rctx, id)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetForPolicy", success, elapsed)
+	}
+	return result, err
+}
+
 func (s *TimerLayerChannelStore) GetForPost(postID string) (*model.Channel, error) {
 	start := time.Now()
 
@@ -2186,6 +2202,22 @@ func (s *TimerLayerChannelStore) GetGuestCount(channelID string, allowFromCache 
 			success = "true"
 		}
 		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetGuestCount", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerChannelStore) GetMandatoryChannels(teamID string) (model.ChannelList, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetMandatoryChannels(teamID)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetMandatoryChannels", success, elapsed)
 	}
 	return result, err
 }

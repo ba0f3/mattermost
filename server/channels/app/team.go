@@ -840,6 +840,9 @@ func (a *App) JoinUserToTeam(rctx request.CTX, team *model.Team, user *model.Use
 		}
 	}
 	if alreadyAdded {
+		if err := a.JoinMandatoryChannels(rctx, team.Id, user); err != nil {
+			return nil, err
+		}
 		return teamMember, nil
 	}
 
@@ -891,6 +894,13 @@ func (a *App) JoinUserToTeam(rctx request.CTX, team *model.Team, user *model.Use
 	message.Add("team_id", team.Id)
 	message.Add("user_id", user.Id)
 	a.Publish(message)
+
+	// Team membership has already been persisted. Keep its normal side effects
+	// complete before returning an enrollment error, then repair any missing
+	// mandatory memberships when the caller retries the join above.
+	if err := a.JoinMandatoryChannels(rctx, team.Id, user); err != nil {
+		return nil, err
+	}
 
 	return teamMember, nil
 }
@@ -1455,6 +1465,33 @@ func (a *App) leaveTeam(rctx request.CTX, team *model.Team, user *model.User, re
 		return model.NewAppError("RemoveTeamMemberFromTeam", "app.team.save_member.save.app_error", nil, "", http.StatusInternalServerError).Wrap(removeErr)
 	}
 	removalStatus = model.AuditStatusSuccess
+
+	// An enrollment that finishes before the team membership is marked deleted
+	// can recreate a row removed by the first pass. Catch it after removal; later
+	// inserts are cleaned up by enrollMandatoryChannelMember's final team check.
+	mandatoryChannels, mandatoryErr := a.Srv().Store().Channel().GetMandatoryChannels(team.Id)
+	if mandatoryErr != nil {
+		return model.NewAppError("LeaveTeam", "app.channel.get_channels.get.app_error", nil, "", http.StatusInternalServerError).Wrap(mandatoryErr)
+	}
+	mandatoryChannelIDs := make(map[string]bool, len(mandatoryChannels))
+	for _, channel := range mandatoryChannels {
+		mandatoryChannelIDs[channel.Id] = true
+	}
+	for _, channel := range channelList {
+		if channel.Mandatory {
+			// Keep channels that were archived or made optional during the leave.
+			mandatoryChannelIDs[channel.Id] = true
+		}
+	}
+	for channelID := range mandatoryChannelIDs {
+		removed, appErr := a.removeMandatoryChannelMembershipIfPresent(rctx, user.Id, channelID)
+		if appErr != nil {
+			return appErr
+		}
+		if removed && policyDriven {
+			a.logAccessControlTeamCascadedChannelRemoval(rctx, removalAudit, channelID)
+		}
+	}
 
 	if err := a.postProcessTeamMemberLeave(rctx, teamMember, requestorId); err != nil {
 		return err

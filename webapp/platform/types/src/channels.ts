@@ -103,6 +103,9 @@ export type Channel = {
     autotranslation?: boolean;
     discoverable?: boolean;
     disable_join_leave_messages?: boolean;
+    posting_policy?: 'all' | 'admins' | 'selected';
+    posting_user_ids?: string[];
+    mandatory?: boolean;
 
     // Create-only: attribute values to store with the channel. Sent so the server
     // can refuse a channel that would not satisfy its own required attributes.

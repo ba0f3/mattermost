@@ -200,6 +200,9 @@ func (a *App) CreateChannelWithUserAndPropertyValues(rctx request.CTX, channel *
 	}
 
 	channel.CreatorId = userID
+	if err := a.validateChannelPostingMembers(rctx, channel); err != nil {
+		return nil, err
+	}
 
 	rchannel, err := a.CreateChannel(rctx, channel, true, propertyValues...)
 	if err != nil {
@@ -253,6 +256,9 @@ func (a *App) RenameChannel(rctx request.CTX, channel *model.Channel, newChannel
 }
 
 func (a *App) CreateChannel(rctx request.CTX, channel *model.Channel, addMember bool, propertyValues ...*model.PropertyValue) (*model.Channel, *model.AppError) {
+	if err := a.validateMandatoryChannel(rctx, channel); err != nil {
+		return nil, err
+	}
 	if channel.IsBoard() {
 		return nil, model.NewAppError("CreateChannel", "app.channel.create_channel.board_type.app_error", nil, "use CreateBoardChannel instead", http.StatusBadRequest)
 	}
@@ -354,6 +360,14 @@ func (a *App) CreateChannel(rctx request.CTX, channel *model.Channel, addMember 
 		if appErr := a.setChannelPropertyValuesOnCreate(rctx, sc, propertyValues); appErr != nil {
 			return nil, appErr
 		}
+	}
+
+	if err := a.SyncMandatoryChannelMembers(rctx, sc); err != nil {
+		if deleteErr := a.PermanentDeleteChannel(rctx, sc); deleteErr != nil {
+			rctx.Logger().Error("Failed to remove channel after mandatory enrollment failed",
+				mlog.String("channel_id", sc.Id), mlog.Err(deleteErr))
+		}
+		return nil, err
 	}
 
 	if sc.IsSpace() {
@@ -802,6 +816,10 @@ func (a *App) GetGroupChannel(rctx request.CTX, userIDs []string) (*model.Channe
 
 // UpdateChannel updates a given channel by its Id. It also publishes the CHANNEL_UPDATED event.
 func (a *App) UpdateChannel(rctx request.CTX, channel *model.Channel) (*model.Channel, *model.AppError) {
+	return a.updateChannel(rctx, channel, false)
+}
+
+func (a *App) updateChannel(rctx request.CTX, channel *model.Channel, updatingPostingSettings bool) (*model.Channel, *model.AppError) {
 	// The generic Get excludes spaces, so fetch a space by its exact type instead; otherwise
 	// UpdateChannel can't load the existing channel and a rename or header edit would fail with
 	// a not-found before it reaches the store.
@@ -812,7 +830,7 @@ func (a *App) UpdateChannel(rctx request.CTX, channel *model.Channel) (*model.Ch
 	if channel.IsSpace() {
 		oldChannel, getErr = a.Srv().Store().Channel().GetChannelOfType(RequestContextWithMaster(rctx), channel.Id, model.ChannelTypeSpace)
 	} else {
-		oldChannel, getErr = a.Srv().Store().Channel().Get(channel.Id, true)
+		oldChannel, getErr = a.Srv().Store().Channel().GetForPolicy(rctx, channel.Id)
 	}
 	if getErr != nil {
 		errCtx := map[string]any{"channel_id": channel.Id}
@@ -857,6 +875,18 @@ func (a *App) UpdateChannel(rctx request.CTX, channel *model.Channel) (*model.Ch
 		}
 	}
 
+	// The stored policy flag is authoritative even when the caller supplied a
+	// partial channel object. Mandatory membership cannot coexist with a policy.
+	channel.PolicyEnforced = oldChannel.PolicyEnforced
+	if !updatingPostingSettings {
+		channel.PostingPolicy = oldChannel.PostingPolicy
+		channel.PostingUserIDs = slices.Clone(oldChannel.PostingUserIDs)
+		channel.Mandatory = oldChannel.Mandatory
+	}
+	if appErr := a.validateMandatoryChannel(rctx, channel); appErr != nil {
+		return nil, appErr
+	}
+
 	_, err := a.Srv().Store().Channel().Update(rctx, channel)
 	if err != nil {
 		var appErr *model.AppError
@@ -875,6 +905,11 @@ func (a *App) UpdateChannel(rctx request.CTX, channel *model.Channel) (*model.Ch
 	}
 
 	a.Srv().Platform().InvalidateCacheForChannel(channel)
+	if channel.Mandatory && (!oldChannel.Mandatory || channel.TeamId != oldChannel.TeamId) {
+		if appErr := a.SyncMandatoryChannelMembers(rctx, channel); appErr != nil {
+			return nil, appErr
+		}
+	}
 
 	// Space backing channels are internal: skip the channel_updated broadcast.
 	if channel.IsSpace() {
@@ -1042,11 +1077,24 @@ func (a *App) RestoreChannel(rctx request.CTX, channel *model.Channel, userID st
 		}
 	}
 
+	previousDeleteAt := channel.DeleteAt
 	if err := a.Srv().Store().Channel().Restore(channel.Id, model.GetMillis()); err != nil {
 		return nil, model.NewAppError("RestoreChannel", "app.channel.restore.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
 	channel.DeleteAt = 0
 	a.Srv().Platform().InvalidateCacheForChannel(channel)
+	if appErr := a.SyncMandatoryChannelMembers(rctx, channel); appErr != nil {
+		// Keep restore retryable when only part of the required membership was
+		// enrolled. Existing memberships are safe to retain while archived.
+		if rollbackErr := a.Srv().Store().Channel().SetDeleteAt(channel.Id, previousDeleteAt, model.GetMillis()); rollbackErr != nil {
+			rctx.Logger().Error("Failed to archive channel after mandatory enrollment failed",
+				mlog.String("channel_id", channel.Id), mlog.Err(rollbackErr))
+		} else {
+			channel.DeleteAt = previousDeleteAt
+		}
+		a.Srv().Platform().InvalidateCacheForChannel(channel)
+		return nil, appErr
+	}
 
 	// Space backing channels are internal: skip the channel_restored chat event and system post.
 	if channel.IsSpace() {
@@ -1121,6 +1169,29 @@ func (a *App) RestoreChannel(rctx request.CTX, channel *model.Channel, userID st
 }
 
 func (a *App) PatchChannel(rctx request.CTX, channel *model.Channel, patch *model.ChannelPatch, userID string) (*model.Channel, *model.AppError) {
+	if !channel.IsSpace() {
+		current, appErr := a.getChannelForPolicy(rctx, channel.Id)
+		if appErr != nil {
+			return nil, appErr
+		}
+		channel = current
+	}
+	updatingPolicy := patch.PostingPolicy != nil || patch.PostingUserIDs != nil || patch.Mandatory != nil
+	if updatingPolicy {
+		if channel.Type != model.ChannelTypeOpen && channel.Type != model.ChannelTypePrivate {
+			return nil, model.NewAppError("PatchChannel", "model.channel.is_valid.posting_settings.channel_type.app_error", nil, "", http.StatusBadRequest)
+		}
+		allowed, appErr := a.CanManageChannelPostingSettings(rctx, channel.Id, userID)
+		if appErr != nil {
+			return nil, appErr
+		}
+		if !allowed {
+			return nil, model.NewAppError("PatchChannel", "app.channel.posting_policy.admin_required", nil, "", http.StatusForbidden)
+		}
+		if channel.DeleteAt != 0 {
+			return nil, model.NewAppError("PatchChannel", "api.channel.update_channel.deleted.app_error", nil, "", http.StatusBadRequest)
+		}
+	}
 	restrictDM, err := a.CheckIfChannelIsRestrictedDM(rctx, channel)
 	if err != nil {
 		return nil, err
@@ -1134,10 +1205,29 @@ func (a *App) PatchChannel(rctx request.CTX, channel *model.Channel, patch *mode
 	oldChannelPurpose := channel.Purpose
 	oldChannelAutotranslation := channel.AutoTranslation
 
+	wasMandatory := channel.Mandatory
+	channel = channel.DeepCopy()
 	channel.Patch(patch)
-	channel, err = a.UpdateChannel(rctx, channel)
+	if updatingPolicy {
+		if appErr := channel.IsValid(); appErr != nil {
+			return nil, appErr
+		}
+	}
+	if patch.PostingUserIDs != nil || patch.PostingPolicy != nil {
+		if appErr := a.validateChannelPostingMembers(rctx, channel); appErr != nil {
+			return nil, appErr
+		}
+	}
+	channel, err = a.updateChannel(rctx, channel, updatingPolicy)
 	if err != nil {
 		return nil, err
+	}
+
+	// Repeating an enable request repairs any enrollment interrupted by an error.
+	if wasMandatory && patch.Mandatory != nil && *patch.Mandatory {
+		if appErr := a.SyncMandatoryChannelMembers(rctx, channel); appErr != nil {
+			return nil, appErr
+		}
 	}
 
 	a.addChannelToDefaultCategory(rctx, userID, channel)
@@ -3051,6 +3141,22 @@ func (a *App) removeChannelMembership(rctx request.CTX, userID, channelID, calle
 }
 
 func (a *App) removeUserFromChannel(rctx request.CTX, userIDToRemove string, removerUserId string, channel *model.Channel) *model.AppError {
+	if !channel.IsSpace() {
+		current, err := a.getChannelForPolicy(rctx, channel.Id)
+		if err != nil {
+			return err
+		}
+		channel = current
+	}
+	if channel.Mandatory {
+		member, err := a.GetTeamMember(RequestContextWithMaster(rctx), channel.TeamId, userIDToRemove)
+		if err != nil && err.StatusCode != http.StatusNotFound {
+			return err
+		}
+		if member != nil && member.DeleteAt == 0 {
+			return model.NewAppError("removeUserFromChannel", "app.channel.mandatory.cannot_leave", nil, "", http.StatusForbidden)
+		}
+	}
 	user, nErr := a.Srv().Store().User().Get(rctx, userIDToRemove)
 	if nErr != nil {
 		var nfErr *store.ErrNotFound
@@ -3986,7 +4092,8 @@ func (a *App) MoveChannel(rctx request.CTX, team *model.Team, channel *model.Cha
 		}
 	}
 
-	return nil
+	a.Srv().Platform().InvalidateCacheForChannel(channel)
+	return a.SyncMandatoryChannelMembers(rctx, channel)
 }
 
 func (a *App) postChannelMoveMessage(rctx request.CTX, user *model.User, channel *model.Channel, previousTeam *model.Team) *model.AppError {

@@ -586,8 +586,9 @@ func patchChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 	updatingManagedCategory := patch.ManagedCategoryName != nil
 	updatingDiscoverable := patch.Discoverable != nil
 	updatingDisableJoinLeaveMessages := patch.DisableJoinLeaveMessages != nil
+	updatingPostingPolicy := patch.PostingPolicy != nil || patch.PostingUserIDs != nil || patch.Mandatory != nil
 
-	if !updatingProperties && !updatingAutoTranslation && patch.BannerInfo == nil && !updatingManagedCategory && !updatingDiscoverable && !updatingDisableJoinLeaveMessages {
+	if !updatingProperties && !updatingAutoTranslation && patch.BannerInfo == nil && !updatingManagedCategory && !updatingDiscoverable && !updatingDisableJoinLeaveMessages && !updatingPostingPolicy {
 		c.Err = model.NewAppError("patchChannel", "api.channel.patch_update_channel.no_changes.app_error", nil, "", http.StatusBadRequest)
 		return
 	}

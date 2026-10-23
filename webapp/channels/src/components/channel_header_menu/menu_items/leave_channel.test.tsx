@@ -25,6 +25,15 @@ describe('components/ChannelHeaderMenu/MenuItems/LeaveChannelTest', () => {
         jest.spyOn(require('react-redux'), 'useDispatch');
     });
 
+    test('hides leave for mandatory channels', () => {
+        renderWithContext(
+            <WithTestMenuContext>
+                <LeaveChannel channel={TestHelper.getChannelMock({mandatory: true})}/>
+            </WithTestMenuContext>,
+        );
+        expect(screen.queryByText('Leave Channel')).not.toBeInTheDocument();
+    });
+
     test('renders the component correctly, handle click event correctly for Public Channel', async () => {
         const channel = TestHelper.getChannelMock();
 

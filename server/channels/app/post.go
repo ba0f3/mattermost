@@ -170,6 +170,11 @@ func (a *App) deduplicateCreatePost(rctx request.CTX, post *model.Post) (foundPo
 }
 
 func (a *App) CreatePost(rctx request.CTX, post *model.Post, channel *model.Channel, flags model.CreatePostFlags) (savedPost *model.Post, isMemberForPreviews bool, err *model.AppError) {
+	if !post.IsSystemMessage() {
+		if appErr := a.CheckChannelPostingPermission(rctx, post.ChannelId, post.UserId); appErr != nil {
+			return nil, false, appErr
+		}
+	}
 	if !a.Config().FeatureFlags.EnableSharedChannelsDMs && channel.IsShared() && (channel.Type == model.ChannelTypeDirect || channel.Type == model.ChannelTypeGroup) {
 		return nil, false, model.NewAppError("CreatePost", "app.post.create_post.shared_dm_or_gm.app_error", nil, "", http.StatusBadRequest)
 	}
@@ -407,12 +412,18 @@ func (a *App) CreatePost(rctx request.CTX, post *model.Post, channel *model.Chan
 
 	var willBePostedPluginIDs []string
 	if post.Type != model.PostTypeBurnOnRead {
+		postingUserID, postingChannelID := post.UserId, post.ChannelId
 		newPost, deliveredIDs, guardErr := a.runGuardedMessageWillBePosted(rctx, post)
 		if guardErr != nil {
 			return nil, false, guardErr
 		}
 		post = newPost
 		willBePostedPluginIDs = deliveredIDs
+		if !post.IsSystemMessage() && (post.UserId != postingUserID || post.ChannelId != postingChannelID) {
+			if appErr := a.CheckChannelPostingPermission(rctx, post.ChannelId, post.UserId); appErr != nil {
+				return nil, false, appErr
+			}
+		}
 	}
 
 	// Pre-fill the CreateAt field for link previews to get the correct timestamp.

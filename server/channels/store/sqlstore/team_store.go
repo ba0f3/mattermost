@@ -1076,6 +1076,9 @@ func (s SqlTeamStore) GetMembers(teamId string, offset int, limit int, teamMembe
 	}
 
 	if teamMembersGetOptions != nil {
+		if teamMembersGetOptions.AfterUserID != "" {
+			query = query.Where(sq.Gt{"TeamMembers.UserId": teamMembersGetOptions.AfterUserID})
+		}
 		if teamMembersGetOptions.Sort == model.USERNAME || teamMembersGetOptions.ExcludeDeletedUsers {
 			query = query.LeftJoin("Users ON TeamMembers.UserId = Users.Id")
 		}
@@ -1097,7 +1100,11 @@ func (s SqlTeamStore) GetMembers(teamId string, offset int, limit int, teamMembe
 	}
 
 	dbMembers := teamMemberWithSchemeRolesList{}
-	err = s.GetReplica().Select(&dbMembers, queryString, args...)
+	db := s.GetReplica()
+	if teamMembersGetOptions != nil && teamMembersGetOptions.UseMaster {
+		db = s.GetMaster()
+	}
+	err = db.Select(&dbMembers, queryString, args...)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to find TeamMembers with teamId=%s", teamId)
 	}

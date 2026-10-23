@@ -217,6 +217,7 @@ type ChannelStore interface {
 	ClearSidebarOnTeamLeave(userID, teamID string) error
 	PermanentDeleteSidebarByUser(userID string) error
 	Get(id string, allowFromCache bool) (*model.Channel, error)
+	GetForPolicy(rctx request.CTX, id string) (*model.Channel, error)
 	GetBoardChannel(id string) (*model.Channel, error)
 	GetChannelOfType(rctx request.CTX, id string, channelType model.ChannelType) (*model.Channel, error)
 	GetMany(ids []string, allowFromCache bool) (model.ChannelList, error)
@@ -243,6 +244,7 @@ type ChannelStore interface {
 	GetPublicChannelsForTeam(teamID string, offset int, limit int) (model.ChannelList, error)
 	GetPublicChannelsByIdsForTeam(teamID string, channelIds []string) (model.ChannelList, error)
 	GetTeamChannels(teamID string) (model.ChannelList, error)
+	GetMandatoryChannels(teamID string) (model.ChannelList, error)
 	GetTeamSpaceChannels(teamID string) (model.ChannelList, error)
 	GetTeamSpaceChannelsForUser(teamID string, userID string) (model.ChannelList, error)
 	GetAll(teamID string) ([]*model.Channel, error)

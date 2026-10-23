@@ -214,6 +214,10 @@ export const haveIGroupPermission: (state: GlobalState, groupID: string, permiss
 );
 
 export function haveIChannelPermission(state: GlobalState, teamId: string | undefined, channelId: string | undefined, permission: string): boolean {
+    if (channelId && (permission === Permissions.CREATE_POST || permission === Permissions.CREATE_POST_PUBLIC) && !canPostWithChannelPostingPolicy(state, channelId)) {
+        return false;
+    }
+
     if (getMySystemPermissions(state).has(permission)) {
         return true;
     }
@@ -227,6 +231,31 @@ export function haveIChannelPermission(state: GlobalState, teamId: string | unde
     }
 
     return false;
+}
+
+/** Only system admins and channel admins can manage the additional channel restrictions. */
+export function canManageChannelPostingAndMembership(state: GlobalState, channelId: string): boolean {
+    const channel = state.entities.channels.channels[channelId];
+    if (!channel || (channel.type !== General.OPEN_CHANNEL && channel.type !== General.PRIVATE_CHANNEL)) {
+        return false;
+    }
+
+    const membership = state.entities.channels.myMembers?.[channelId];
+    return getMySystemRoles(state).has(General.SYSTEM_ADMIN_ROLE) || Boolean(membership?.scheme_admin || membership?.roles?.split(' ').includes(General.CHANNEL_ADMIN_ROLE));
+}
+
+/** This is an additional restriction; callers must still check the create_post permission. */
+export function canPostWithChannelPostingPolicy(state: GlobalState, channelId: string): boolean {
+    const channel = state.entities.channels.channels[channelId];
+    if (!channel || (channel.type !== General.OPEN_CHANNEL && channel.type !== General.PRIVATE_CHANNEL) || !channel.posting_policy || channel.posting_policy === 'all') {
+        return true;
+    }
+
+    if (canManageChannelPostingAndMembership(state, channelId)) {
+        return true;
+    }
+
+    return channel.posting_policy === 'selected' && Boolean(state.entities.channels.myMembers?.[channelId]) && Boolean(channel.posting_user_ids?.includes(getCurrentUserId(state)));
 }
 
 export function haveICurrentTeamPermission(state: GlobalState, permission: string): boolean {

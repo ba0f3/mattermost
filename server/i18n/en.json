@@ -7455,6 +7455,16 @@
     "description": "API error returned when updating a channel join request (e.g. approving or denying it) fails."
   },
   {
+    "id": "app.channel.mandatory.cannot_leave",
+    "translation": "This channel is mandatory. You cannot leave or remove its members.",
+    "description": "Shown when someone tries to leave a mandatory channel or remove one of its members."
+  },
+  {
+    "id": "app.channel.mandatory.conflicting_membership",
+    "translation": "Mandatory channels cannot use group-constrained membership or access control policies.",
+    "description": "Shown when mandatory team membership conflicts with a channel group or access control policy."
+  },
+  {
     "id": "app.channel.migrate_channel_members.select.app_error",
     "translation": "Failed to select the batch of channel members.",
     "description": "Error from the advanced-permissions migration job when reading a batch of channel members from the database fails; visible in the jobs table/logs."
@@ -7513,6 +7523,21 @@
     "id": "app.channel.post_update_channel_purpose_message.updated_to",
     "translation": "%s updated the channel purpose to: %s",
     "description": "System post message shown in a channel when a purpose is set for the first time; first %s is the member's username, second %s is the new purpose text."
+  },
+  {
+    "id": "app.channel.posting_policy.admin_required",
+    "translation": "Only system or channel administrators can change posting and mandatory membership settings.",
+    "description": "Shown when a non-admin attempts to update channel posting or mandatory membership settings."
+  },
+  {
+    "id": "app.channel.posting_policy.denied",
+    "translation": "Only channel administrators and selected members can post in this channel.",
+    "description": "Shown when a user attempts to post or reply in a channel whose posting policy does not permit them."
+  },
+  {
+    "id": "app.channel.posting_policy.member_required",
+    "translation": "Selected posters must be members of this channel.",
+    "description": "Shown when an administrator selects a poster who does not belong to the channel."
   },
   {
     "id": "app.channel.remove_all_deactivated_members.app_error",
@@ -16205,6 +16230,21 @@
     "id": "model.channel.is_valid.name.app_error",
     "translation": "Channel names can't be in a hexadecimal format. Please enter a different channel name.",
     "description": "API validation error shown when a new channel's URL name looks like a 26-character hexadecimal string (reserved for IDs); asks the user to pick a different name."
+  },
+  {
+    "id": "model.channel.is_valid.posting_policy.app_error",
+    "translation": "Choose a valid channel posting policy.",
+    "description": "Validation error for an unknown channel posting policy."
+  },
+  {
+    "id": "model.channel.is_valid.posting_settings.channel_type.app_error",
+    "translation": "Posting restrictions and mandatory membership are only available for public and private team channels.",
+    "description": "Shown when channel posting or mandatory settings are applied to direct, group or internal channels."
+  },
+  {
+    "id": "model.channel.is_valid.posting_user_ids.app_error",
+    "translation": "Selected posters must be unique valid user IDs, with at most 1000 users, and require the selected-members posting policy.",
+    "description": "Validation error for the channel selected-poster list."
   },
   {
     "id": "model.channel.is_valid.purpose.app_error",

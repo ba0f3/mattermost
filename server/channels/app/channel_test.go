@@ -3499,12 +3499,14 @@ func TestConvertGroupMessageToChannel(t *testing.T) {
 
 	mockChannelStore := mocks.ChannelStore{}
 	mockStore.On("Channel").Return(&mockChannelStore)
-	mockChannelStore.On("Get", "channelidchannelidchanneli", true).Return(&model.Channel{
+	groupChannel := &model.Channel{
 		Id:       "channelidchannelidchanneli",
 		CreateAt: time.Now().Unix(),
 		UpdateAt: time.Now().Unix(),
 		Type:     model.ChannelTypeGroup,
-	}, nil)
+	}
+	mockChannelStore.On("Get", "channelidchannelidchanneli", true).Return(groupChannel, nil)
+	mockChannelStore.On("GetForPolicy", mock.Anything, "channelidchannelidchanneli").Return(groupChannel, nil)
 	mockChannelStore.On("Update", mock.AnythingOfType("*request.Context"), mock.AnythingOfType("*model.Channel")).Return(&model.Channel{}, nil)
 	mockChannelStore.On("InvalidateChannel", "channelidchannelidchanneli")
 	mockChannelStore.On("InvalidateChannelByName", "team_id_1", "new_name").Times(1)

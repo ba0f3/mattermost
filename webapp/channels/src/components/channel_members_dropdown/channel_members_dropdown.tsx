@@ -160,7 +160,7 @@ export default function ChannelMembersDropdown({
 
     const canMakeUserChannelMember = canChangeMemberRoles && isChannelAdmin;
     const canMakeUserChannelAdmin = canChangeMemberRoles && isMember;
-    const canRemoveUserFromChannel = canRemoveMember && (!channel.group_constrained || user.is_bot) && (!isDefaultChannel || isGuest);
+    const canRemoveUserFromChannel = canRemoveMember && !channel.mandatory && (!channel.group_constrained || user.is_bot) && (!isDefaultChannel || isGuest);
     const removeFromChannelText = user.id === currentUserId ? intl.formatMessage({id: 'channel_header.leave', defaultMessage: 'Leave Channel'}) : intl.formatMessage({id: 'channel_members_dropdown.remove_from_channel', defaultMessage: 'Remove from Channel'});
     const removeFromChannelTestId = user.id === currentUserId ? 'leaveChannel' : 'removeFromChannel';
 

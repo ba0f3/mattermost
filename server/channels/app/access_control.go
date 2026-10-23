@@ -2450,6 +2450,10 @@ func (a *App) publishTeamPolicyEnforcedUpdate(rctx request.CTX, teamID string) {
 // access control policy assignment: must be public or private (DM/GM excluded),
 // not group-constrained, not shared, and not a team default channel (e.g. town-square).
 func (a *App) ValidateChannelEligibilityForAccessControl(rctx request.CTX, channel *model.Channel) *model.AppError {
+	if channel.Mandatory {
+		return model.NewAppError("ValidateChannelEligibilityForAccessControl", "app.channel.mandatory.conflicting_membership", nil, "", http.StatusBadRequest)
+	}
+
 	if channel.Type != model.ChannelTypePrivate && channel.Type != model.ChannelTypeOpen {
 		return model.NewAppError("ValidateChannelEligibilityForAccessControl",
 			"app.pap.access_control.channel_type_not_supported",

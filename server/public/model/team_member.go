@@ -82,6 +82,13 @@ type TeamMembersGetOptions struct {
 	// If true, exclude team members whose corresponding user is deleted.
 	ExcludeDeletedUsers bool
 
+	// Read from the primary when membership synchronization requires current data.
+	UseMaster bool
+
+	// Resume UserId-ordered pagination after this user, without offset shifts
+	// when team members leave during membership synchronization.
+	AfterUserID string
+
 	// Restrict to search in a list of teams and channels
 	ViewRestrictions *ViewUsersRestrictions
 }

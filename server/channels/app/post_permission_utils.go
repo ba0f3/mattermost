@@ -111,8 +111,7 @@ func userCreatePostPermissionCheckWithApp(rctx request.CTX, a *App, userId, chan
 	if !hasPermission {
 		return model.MakePermissionErrorForUser(userId, []*model.Permission{model.PermissionCreatePost})
 	}
-
-	return nil
+	return a.CheckChannelPostingPermission(rctx, channelId, userId)
 }
 
 // PostCardTypeCheckWithApp validates whether a card post can be created

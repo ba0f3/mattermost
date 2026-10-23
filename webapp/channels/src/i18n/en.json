@@ -20375,6 +20375,22 @@
     "defaultMessage": "When enabled, join and leave system messages are shown in this channel for all users. When disabled, they are hidden regardless of account-wide Advanced settings. Stored messages reappear if you turn this back on.",
     "description": "Help text for the join/leave messages toggle in Channel Settings > Configuration. 'Advanced settings' refers to the Advanced tab of the user's Settings dialog, where each user has their own join/leave preference."
   },
+  "channel_settings.mandatory.description": {
+    "defaultMessage": "Add all existing and new team members, including guests, to this channel. They cannot leave or be removed while they belong to the team. Turning this off keeps current channel members.",
+    "description": ""
+  },
+  "channel_settings.mandatory.label": {
+    "defaultMessage": "Require all team members",
+    "description": ""
+  },
+  "channel_settings.mandatory.managed": {
+    "defaultMessage": "Mandatory membership is unavailable while this channel is managed by a group or access policy.",
+    "description": ""
+  },
+  "channel_settings.mandatory.title": {
+    "defaultMessage": "Membership",
+    "description": ""
+  },
   "channel_settings.modal.archiveTitle": {
     "defaultMessage": "Archive channel?",
     "description": "Title of the confirmation dialog shown before archiving a channel from Channel Settings."
@@ -20623,6 +20639,58 @@
     "defaultMessage": "This channel has a membership policy applied. Remove the policy before changing between public and private.",
     "description": "Explanation shown on the Info tab when the public/private selector is disabled because a membership policy is applied to the channel."
   },
+  "channel_settings.posting.admins": {
+    "defaultMessage": "Admins only",
+    "description": ""
+  },
+  "channel_settings.posting.all": {
+    "defaultMessage": "Everyone",
+    "description": ""
+  },
+  "channel_settings.posting.clear_search": {
+    "defaultMessage": "Clear search",
+    "description": ""
+  },
+  "channel_settings.posting.description": {
+    "defaultMessage": "Choose who can send messages and replies. Existing posting permissions still apply. Admins include channel admins and system admins.",
+    "description": ""
+  },
+  "channel_settings.posting.load_more": {
+    "defaultMessage": "Load more members",
+    "description": ""
+  },
+  "channel_settings.posting.loading": {
+    "defaultMessage": "Loading members…",
+    "description": ""
+  },
+  "channel_settings.posting.member_limit": {
+    "defaultMessage": "You can select up to {limit} members.",
+    "description": ""
+  },
+  "channel_settings.posting.no_members": {
+    "defaultMessage": "No members found.",
+    "description": ""
+  },
+  "channel_settings.posting.retry": {
+    "defaultMessage": "Retry",
+    "description": ""
+  },
+  "channel_settings.posting.search": {
+    "defaultMessage": "Search members",
+    "description": ""
+  },
+  "channel_settings.posting.selected": {
+    "defaultMessage": "Admins and selected members",
+    "description": ""
+  },
+  "channel_settings.posting.unavailable_member": {
+    "defaultMessage": "Unavailable member",
+    "description": ""
+  },
+  "channel_settings.posting.who_can_post": {
+    "defaultMessage": "Who can post?",
+    "description": ""
+  },
   "channel_settings.purpose.description": {
     "defaultMessage": "Describe how this channel should be used.",
     "description": "Help text under the channel purpose field on the Info tab of Channel Settings."
@@ -20734,6 +20802,10 @@
   "channel_settings.tab.permissions_policy": {
     "defaultMessage": "Permissions Policy",
     "description": "Tab name in the Channel Settings modal sidebar for per-channel permission rules; compact."
+  },
+  "channel_settings.tab.posting_membership": {
+    "defaultMessage": "Posting & Membership",
+    "description": ""
   },
   "channel_settings.unknown_error": {
     "defaultMessage": "Something went wrong.",

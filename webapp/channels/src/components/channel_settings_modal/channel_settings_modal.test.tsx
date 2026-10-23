@@ -37,6 +37,7 @@ jest.mock('mattermost-redux/selectors/entities/channel_banner', () => ({
 
 // Mock the roles selector which is used for permission checks
 jest.mock('mattermost-redux/selectors/entities/roles', () => ({
+    canManageChannelPostingAndMembership: jest.fn().mockReturnValue(false),
     haveIChannelPermission: jest.fn().mockImplementation((state, teamId, channelId, permission) => {
         // Return different values based on the permission being checked
         if (permission === 'delete_private_channel') {

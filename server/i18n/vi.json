@@ -14728,5 +14728,37 @@
   {
     "id": "model.scheduled_post.is_valid.repeat_burn_on_read.app_error",
     "translation": "Không thể gửi tin nhắn tự hủy sau khi đọc dưới dạng tin nhắn đã lên lịch lặp lại."
+  },
+  {
+    "id": "app.channel.posting_policy.denied",
+    "translation": "Chỉ quản trị viên kênh và người được chọn mới được đăng tin trong kênh này."
+  },
+  {
+    "id": "app.channel.posting_policy.admin_required",
+    "translation": "Chỉ quản trị viên hệ thống hoặc quản trị viên kênh mới được thay đổi quyền đăng tin và cài đặt tham gia bắt buộc."
+  },
+  {
+    "id": "app.channel.posting_policy.member_required",
+    "translation": "Người được chọn đăng tin phải là thành viên của kênh."
+  },
+  {
+    "id": "app.channel.mandatory.conflicting_membership",
+    "translation": "Kênh bắt buộc không thể sử dụng nhóm đồng bộ hoặc chính sách kiểm soát truy cập để quản lý thành viên."
+  },
+  {
+    "id": "app.channel.mandatory.cannot_leave",
+    "translation": "Đây là kênh bắt buộc. Bạn không thể rời kênh hoặc xóa thành viên khỏi kênh."
+  },
+  {
+    "id": "model.channel.is_valid.posting_policy.app_error",
+    "translation": "Hãy chọn quyền đăng tin hợp lệ cho kênh."
+  },
+  {
+    "id": "model.channel.is_valid.posting_user_ids.app_error",
+    "translation": "Danh sách người đăng tin phải có ID hợp lệ, không trùng lặp, tối đa 1000 người và sử dụng chế độ người được chọn."
+  },
+  {
+    "id": "model.channel.is_valid.posting_settings.channel_type.app_error",
+    "translation": "Quyền đăng tin và tham gia bắt buộc chỉ áp dụng cho kênh công khai hoặc riêng tư trong nhóm."
   }
 ]

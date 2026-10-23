@@ -45,6 +45,11 @@ const (
 	ChannelPurposeMaxRunes     = 250
 	ChannelCacheSize           = 25000
 	ChannelBannerInfoMaxLength = 1024
+	ChannelPostingUserIDsMax   = 1000
+
+	ChannelPostingPolicyAll      = "all"
+	ChannelPostingPolicyAdmins   = "admins"
+	ChannelPostingPolicySelected = "selected"
 
 	ChannelSortByUsername = "username"
 	ChannelSortByStatus   = "status"
@@ -123,11 +128,14 @@ type Channel struct {
 	//
 	// Deprecated: use PolicyAutoAdd. Auto-adding members is no longer tied to a
 	// policy's active flag.
-	PolicyIsActive           bool   `json:"policy_is_active"`
-	DefaultCategoryName      string `json:"default_category_name"`
-	ManagedCategoryName      string `json:"managed_category_name"`
-	Discoverable             bool   `json:"discoverable"`
-	DisableJoinLeaveMessages bool   `json:"disable_join_leave_messages"`
+	PolicyIsActive           bool        `json:"policy_is_active"`
+	DefaultCategoryName      string      `json:"default_category_name"`
+	ManagedCategoryName      string      `json:"managed_category_name"`
+	Discoverable             bool        `json:"discoverable"`
+	DisableJoinLeaveMessages bool        `json:"disable_join_leave_messages"`
+	PostingPolicy            string      `json:"posting_policy"`
+	PostingUserIDs           StringArray `json:"posting_user_ids"`
+	Mandatory                bool        `json:"mandatory"`
 }
 
 // HasPolicyAction reports whether the channel's policy declares the given
@@ -173,6 +181,9 @@ func (o *Channel) Auditable() map[string]any {
 		"policy_auto_add":             o.PolicyAutoAdd, // this field is only for logging purposes
 		"discoverable":                o.Discoverable,
 		"disable_join_leave_messages": o.DisableJoinLeaveMessages,
+		"posting_policy":              o.PostingPolicy,
+		"posting_user_ids":            o.PostingUserIDs,
+		"mandatory":                   o.Mandatory,
 	}
 }
 
@@ -213,6 +224,9 @@ type ChannelPatch struct {
 	DefaultCategoryName      *string            `json:"default_category_name"`
 	Discoverable             *bool              `json:"discoverable"`
 	DisableJoinLeaveMessages *bool              `json:"disable_join_leave_messages"`
+	PostingPolicy            *string            `json:"posting_policy"`
+	PostingUserIDs           *StringArray       `json:"posting_user_ids"`
+	Mandatory                *bool              `json:"mandatory"`
 }
 
 func (c *ChannelPatch) Auditable() map[string]any {
@@ -224,6 +238,9 @@ func (c *ChannelPatch) Auditable() map[string]any {
 		"managed_category_name":       c.ManagedCategoryName,
 		"discoverable":                c.Discoverable,
 		"disable_join_leave_messages": c.DisableJoinLeaveMessages,
+		"posting_policy":              c.PostingPolicy,
+		"posting_user_ids":            c.PostingUserIDs,
+		"mandatory":                   c.Mandatory,
 	}
 }
 
@@ -324,6 +341,7 @@ func WithID(ID string) ChannelOption {
 
 func (o *Channel) DeepCopy() *Channel {
 	cCopy := *o
+	cCopy.PostingUserIDs = slices.Clone(o.PostingUserIDs)
 	if cCopy.SchemeId != nil {
 		cCopy.SchemeId = new(*o.SchemeId)
 	}
@@ -402,6 +420,28 @@ func (o *Channel) IsValid() *AppError {
 		return NewAppError("Channel.IsValid", "model.channel.is_valid.group_constrained.app_error", nil, "id="+o.Id, http.StatusBadRequest)
 	}
 
+	switch o.PostingPolicy {
+	case "", ChannelPostingPolicyAll, ChannelPostingPolicyAdmins, ChannelPostingPolicySelected:
+	default:
+		return NewAppError("Channel.IsValid", "model.channel.is_valid.posting_policy.app_error", nil, "id="+o.Id, http.StatusBadRequest)
+	}
+
+	if o.Type != ChannelTypeOpen && o.Type != ChannelTypePrivate &&
+		(o.Mandatory || (o.PostingPolicy != "" && o.PostingPolicy != ChannelPostingPolicyAll) || len(o.PostingUserIDs) != 0) {
+		return NewAppError("Channel.IsValid", "model.channel.is_valid.posting_settings.channel_type.app_error", nil, "id="+o.Id, http.StatusBadRequest)
+	}
+
+	if len(o.PostingUserIDs) > ChannelPostingUserIDsMax || (o.PostingPolicy != ChannelPostingPolicySelected && len(o.PostingUserIDs) != 0) {
+		return NewAppError("Channel.IsValid", "model.channel.is_valid.posting_user_ids.app_error", nil, "id="+o.Id, http.StatusBadRequest)
+	}
+	seenPostingUsers := make(map[string]bool, len(o.PostingUserIDs))
+	for _, userID := range o.PostingUserIDs {
+		if !IsValidId(userID) || seenPostingUsers[userID] {
+			return NewAppError("Channel.IsValid", "model.channel.is_valid.posting_user_ids.app_error", nil, "id="+o.Id, http.StatusBadRequest)
+		}
+		seenPostingUsers[userID] = true
+	}
+
 	return nil
 }
 
@@ -436,12 +476,23 @@ func (o *Channel) PreSave() {
 	}
 	o.UpdateAt = o.CreateAt
 	o.ExtraUpdateAt = 0
+	o.normalizePostingPolicy()
 }
 
 func (o *Channel) PreUpdate() {
 	o.UpdateAt = GetMillis()
 	o.Name = SanitizeUnicode(o.Name)
 	o.DisplayName = SanitizeUnicode(o.DisplayName)
+	o.normalizePostingPolicy()
+}
+
+func (o *Channel) normalizePostingPolicy() {
+	if o.PostingPolicy == "" {
+		o.PostingPolicy = ChannelPostingPolicyAll
+	}
+	if o.PostingUserIDs == nil {
+		o.PostingUserIDs = StringArray{}
+	}
 }
 
 func (o *Channel) IsGroupOrDirect() bool {
@@ -542,6 +593,18 @@ func (o *Channel) Patch(patch *ChannelPatch) {
 
 	if patch.DisableJoinLeaveMessages != nil {
 		o.DisableJoinLeaveMessages = *patch.DisableJoinLeaveMessages
+	}
+	if patch.PostingPolicy != nil {
+		o.PostingPolicy = *patch.PostingPolicy
+		if o.PostingPolicy != ChannelPostingPolicySelected && patch.PostingUserIDs == nil {
+			o.PostingUserIDs = StringArray{}
+		}
+	}
+	if patch.PostingUserIDs != nil {
+		o.PostingUserIDs = slices.Clone(*patch.PostingUserIDs)
+	}
+	if patch.Mandatory != nil {
+		o.Mandatory = *patch.Mandatory
 	}
 }
 

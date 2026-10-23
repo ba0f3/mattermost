@@ -182,6 +182,9 @@ func channelSliceColumns(isSelect bool, prefix ...string) []string {
 		p + "DefaultCategoryName",
 		p + "Discoverable",
 		p + "DisableJoinLeaveMessages",
+		p + "PostingPolicy",
+		p + "PostingUserIDs",
+		p + "Mandatory",
 	}
 
 	if isSelect {
@@ -226,6 +229,9 @@ func channelToSlice(channel *model.Channel) []any {
 		channel.DefaultCategoryName,
 		channel.Discoverable,
 		channel.DisableJoinLeaveMessages,
+		channel.PostingPolicy,
+		channel.PostingUserIDs,
+		channel.Mandatory,
 	}
 }
 
@@ -905,7 +911,10 @@ func (s SqlChannelStore) updateChannelT(transaction *sqlxTxWrapper, channel *mod
 			DefaultCategoryName=:DefaultCategoryName,
 			AutoTranslation=:AutoTranslation,
 			Discoverable=:Discoverable,
-			DisableJoinLeaveMessages=:DisableJoinLeaveMessages
+			DisableJoinLeaveMessages=:DisableJoinLeaveMessages,
+			PostingPolicy=:PostingPolicy,
+			PostingUserIDs=:PostingUserIDs,
+			Mandatory=:Mandatory
 		WHERE Id=:Id`, channel)
 	if err != nil {
 		if IsUniqueConstraintError(err, []string{"Name", "channels_name_teamid_key"}) {
@@ -1023,6 +1032,20 @@ func (s SqlChannelStore) GetBoardChannel(id string) (*model.Channel, error) {
 	}
 
 	return &ch, nil
+}
+
+// GetForPolicy bypasses caches and replicas so authorization observes current
+// policy, including a channel whose type has just changed.
+func (s SqlChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
+	channel := model.Channel{}
+	query := s.tableSelectQuery.Where(sq.Eq{"Id": id, "Type": messageChannelTypes})
+	if err := s.DBXFromContext(store.RequestContextWithMaster(rctx).Context()).GetBuilder(&channel, query); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, store.NewErrNotFound("Channel", id)
+		}
+		return nil, errors.Wrapf(err, "failed to find channel policy with id = %s", id)
+	}
+	return &channel, nil
 }
 
 // GetChannelOfType fetches a channel by ID, requiring it to be of the given type. Unlike Get(),
@@ -1589,6 +1612,22 @@ func (s SqlChannelStore) GetTeamChannels(teamId string) (model.ChannelList, erro
 	}
 
 	return data, nil
+}
+
+// GetMandatoryChannels reads from the primary so team joins observe newly
+// enabled mandatory channels even when a read replica has not caught up.
+func (s SqlChannelStore) GetMandatoryChannels(teamID string) (model.ChannelList, error) {
+	channels := model.ChannelList{}
+	query := s.tableSelectQuery.Where(sq.Eq{
+		"TeamId":    teamID,
+		"Type":      []model.ChannelType{model.ChannelTypeOpen, model.ChannelTypePrivate},
+		"Mandatory": true,
+		"DeleteAt":  0,
+	}).OrderBy("Id")
+	if err := s.GetMaster().SelectBuilder(&channels, query); err != nil {
+		return nil, errors.Wrapf(err, "failed to find mandatory channels with teamId=%s", teamID)
+	}
+	return channels, nil
 }
 
 // GetTeamSpaceChannels returns all space (S) channels for a team, including archived ones, so

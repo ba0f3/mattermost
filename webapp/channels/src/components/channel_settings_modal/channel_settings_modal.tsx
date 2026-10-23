@@ -16,7 +16,7 @@ import type {Channel} from '@mattermost/types/channels';
 import Permissions from 'mattermost-redux/constants/permissions';
 import {getChannel} from 'mattermost-redux/selectors/entities/channels';
 import {getConfig, getLicense, isChannelPermissionPoliciesEnabled} from 'mattermost-redux/selectors/entities/general';
-import {haveIChannelPermission, haveISystemPermission} from 'mattermost-redux/selectors/entities/roles';
+import {canManageChannelPostingAndMembership, haveIChannelPermission, haveISystemPermission} from 'mattermost-redux/selectors/entities/roles';
 
 import {getBasePath, isChannelAccessControlEnabled} from 'selectors/general';
 import {getChannelSettingsTabs} from 'selectors/plugins';
@@ -36,6 +36,7 @@ import ChannelSettingsConfigurationTab from './channel_settings_configuration_ta
 import ChannelSettingsInfoTab from './channel_settings_info_tab';
 import ChannelSettingsPermissionsPolicyTab from './channel_settings_permissions_policy_tab';
 import ChannelSettingsPluginTab from './channel_settings_plugin_tab';
+import ChannelSettingsPostingTab from './channel_settings_posting_tab';
 
 import './channel_settings_modal.scss';
 
@@ -54,6 +55,7 @@ const BuiltInTabIds = {
     ACCESS_RULES: 'access_rules',
     PERMISSIONS_POLICY: 'permissions_policy',
     CONFIGURATION: 'configuration',
+    POSTING: 'posting',
     ARCHIVE: 'archive',
 } as const;
 type BuiltInTabId = typeof BuiltInTabIds[keyof typeof BuiltInTabIds];
@@ -149,6 +151,7 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
     const canManageJoinLeaveMessages = !isDMorGM && canManageChannelProperties;
     const shouldShowConfigurationTab = canManageBanner || canManageChannelTranslation || canManageSharedChannels || canManageJoinLeaveMessages;
     const shouldShowInfoTab = canManageChannelProperties;
+    const shouldShowPostingTab = useSelector((state: GlobalState) => canManageChannelPostingAndMembership(state, channel.id));
 
     const canArchivePrivateChannels = useSelector((state: GlobalState) =>
         haveIChannelPermission(state, channel.team_id, channel.id, Permissions.DELETE_PRIVATE_CHANNEL),
@@ -243,6 +246,13 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
                 display: shouldShowConfigurationTab,
             },
             {
+                name: BuiltInTabIds.POSTING,
+                uiName: formatMessage({id: 'channel_settings.tab.posting_membership', defaultMessage: 'Posting & Membership'}),
+                icon: 'icon icon-account-multiple-outline',
+                iconTitle: formatMessage({id: 'channel_settings.tab.posting_membership', defaultMessage: 'Posting & Membership'}),
+                display: shouldShowPostingTab,
+            },
+            {
                 name: BuiltInTabIds.ARCHIVE,
                 uiName: formatMessage({id: 'channel_settings.tab.archive', defaultMessage: 'Archive Channel'}),
                 icon: 'icon icon-archive-outline',
@@ -256,6 +266,7 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
         shouldShowAccessRulesTab,
         shouldShowPermissionsPolicyTab,
         shouldShowConfigurationTab,
+        shouldShowPostingTab,
         shouldShowArchiveTab,
     ]);
 
@@ -413,6 +424,15 @@ function ChannelSettingsModal({channelId, isOpen, onExited, focusOriginElement}:
             return renderPermissionsPolicyTab();
         case BuiltInTabIds.CONFIGURATION:
             return renderConfigurationTab();
+        case BuiltInTabIds.POSTING:
+            return (
+                <ChannelSettingsPostingTab
+                    key={channel.id}
+                    channel={channel}
+                    setAreThereUnsavedChanges={setUnsaved}
+                    showTabSwitchError={showTabSwitchError}
+                />
+            );
         case BuiltInTabIds.ARCHIVE:
             return renderArchiveTab();
         default: {

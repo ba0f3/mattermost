@@ -2477,6 +2477,27 @@ func (s *RetryLayerChannelStore) GetFileCount(channelID string) (int64, error) {
 
 }
 
+func (s *RetryLayerChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetForPolicy(rctx, id)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
 func (s *RetryLayerChannelStore) GetForPost(postID string) (*model.Channel, error) {
 
 	tries := 0
@@ -2503,6 +2524,27 @@ func (s *RetryLayerChannelStore) GetGuestCount(channelID string, allowFromCache 
 	tries := 0
 	for {
 		result, err := s.ChannelStore.GetGuestCount(channelID, allowFromCache)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerChannelStore) GetMandatoryChannels(teamID string) (model.ChannelList, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetMandatoryChannels(teamID)
 		if err == nil {
 			return result, nil
 		}

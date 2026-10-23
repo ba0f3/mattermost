@@ -1226,6 +1226,19 @@ func (a *App) invalidateUserChannelMembersCaches(rctx request.CTX, userID string
 	return nil
 }
 
+func (a *App) joinUserToMandatoryChannels(rctx request.CTX, user *model.User) *model.AppError {
+	memberships, appErr := a.GetTeamMembersForUser(RequestContextWithMaster(rctx), user.Id, "", false)
+	if appErr != nil {
+		return appErr
+	}
+	for _, membership := range memberships {
+		if appErr := a.JoinMandatoryChannels(rctx, membership.TeamId, user); appErr != nil {
+			return appErr
+		}
+	}
+	return nil
+}
+
 func (a *App) UpdateActive(rctx request.CTX, user *model.User, active bool) (*model.User, *model.AppError) {
 	if active {
 		atUserLimit, appErr := a.isAtUserLimit()
@@ -1290,6 +1303,9 @@ func (a *App) UpdateActive(rctx request.CTX, user *model.User, active bool) (*mo
 	}
 
 	if active {
+		if appErr := a.joinUserToMandatoryChannels(rctx, ruser); appErr != nil {
+			return nil, appErr
+		}
 		userLimits, appErr := a.GetServerLimits(true)
 		if appErr != nil {
 			rctx.Logger().Error("Error fetching user limits in UpdateActive", mlog.Err(appErr))
@@ -2712,7 +2728,10 @@ func (a *App) UpdateOAuthUserAttrs(rctx request.CTX, userData io.Reader, user *m
 		a.InvalidateCacheForUser(user.Id)
 	}
 
-	return nil
+	// OAuth can reactivate a user without going through UpdateActive. Reconcile
+	// on subsequent logins too, so enrollment can recover if activation was
+	// persisted but a previous mandatory channel join failed.
+	return a.joinUserToMandatoryChannels(rctx, user)
 }
 
 func (a *App) RestrictUsersGetByPermissions(rctx request.CTX, userID string, options *model.UserGetOptions) (*model.UserGetOptions, *model.AppError) {
