@@ -47,6 +47,21 @@ WEB_DEV_URL := http://localhost:9005
 PLUGIN_DIR ?= ../mattermost-plugin-agents
 PLUGIN_GIT_URL ?= https://github.com/r2d-ai/mattermost-plugin-agents.git
 
+# Runtime image built by `make image`.
+GHCR_OWNER ?= $(shell git remote get-url origin 2>/dev/null | sed -E 's#.*[:/]([^/]+)/[^/]+(\.git)?$$#\1#' | tr '[:upper:]' '[:lower:]')
+IMAGE ?= ghcr.io/$(GHCR_OWNER)/mattermost-team-edition
+IMAGE_TAG ?= dev
+# The runtime image is always built for amd64 so it can be pushed to an x86
+# host even when developing on Apple Silicon or another arm64 machine.
+PLATFORM ?= linux/amd64
+IMAGE_HTTP_PORT ?= 18765
+# PWD stays at the repo root for `make -C server`, so point GOBIN at server/bin.
+IMAGE_GOBIN := $(CURDIR)/$(SERVER_DIR)/bin
+HOST_ARCH := $(shell uname -m)
+# Rebuild the production web client before packaging. Set to false to reuse the
+# existing webapp/channels/dist (useful when the dev server is running).
+IMAGE_BUILD_CLIENT ?= true
+
 # watch: webpack --watch, assets served by the Go server (port 8065)
 # dev-server: webpack-dev-server with HMR (port 9005, proxies /api to 8065)
 WEB_MODE ?= watch
@@ -56,7 +71,7 @@ else
 WEB_TARGET := run
 endif
 
-.PHONY: help start stop restart start-app stop-app restart-app start-web stop-web restart-web status logs logs-app logs-web stop-all deps admin plugin-install
+.PHONY: help start stop restart start-app stop-app restart-app start-web stop-web restart-web status logs logs-app logs-web stop-all deps admin plugin-install image image-push
 
 help: ## Show this help
 	@printf 'Mattermost dev targets:\n\n'
@@ -123,6 +138,54 @@ plugin-install: ## Build and deploy the Agents plugin (the app must be running)
 	MM_ADMIN_PASSWORD="$${DEV_ADMIN_PASSWORD}" \
 	MM_SERVICESETTINGS_SITEURL="$${MM_SERVICESETTINGS_SITEURL}" \
 	$(MAKE) -C $(PLUGIN_DIR) deploy MM_SERVICESETTINGS_ENABLEDEVELOPER=true
+
+image: ## Build the runtime Mattermost image (default PLATFORM=linux/amd64)
+	if [ "$(HOST_ARCH)" != "x86_64" ]; then
+		echo "Note: building $(PLATFORM) on $(HOST_ARCH) needs binfmt/QEMU."
+		echo "      Docker Desktop has it; on Linux: docker run --privileged --rm tonistiigi/binfmt --install amd64"
+	fi
+	$(MAKE) -C $(SERVER_DIR) PWD=$(CURDIR)/$(SERVER_DIR) GOBIN=$(IMAGE_GOBIN) build-linux-amd64
+ifeq ($(IMAGE_BUILD_CLIENT),true)
+	$(MAKE) -C $(WEBAPP_DIR) dist
+endif
+	$(MAKE) -C $(SERVER_DIR) PWD=$(CURDIR)/$(SERVER_DIR) GOBIN=$(IMAGE_GOBIN) package-linux-amd64 PLUGIN_PACKAGES=
+	TARBALL=$$(ls $(CURDIR)/$(SERVER_DIR)/dist/mattermost-*-linux-amd64.tar.gz | head -n1)
+	if [ -z "$$TARBALL" ]; then
+		echo "No Mattermost package tarball was produced" >&2
+		exit 1
+	fi
+	echo "Building $(IMAGE):$(IMAGE_TAG) for $(PLATFORM) from $$TARBALL"
+	PKG_SUM=$$(openssl dgst -sha256 -r "$$TARBALL" | cut -d' ' -f1)
+	cd "$$(dirname "$$TARBALL")"
+	python3 -m http.server $(IMAGE_HTTP_PORT) --bind 0.0.0.0 >/tmp/mattermost-image-http.log 2>&1 &
+	HTTP_PID=$$!
+	trap 'kill $$HTTP_PID 2>/dev/null || true' EXIT
+	sleep 1
+	if ! kill -0 "$$HTTP_PID" 2>/dev/null; then
+		echo "Failed to start package HTTP server on port $(IMAGE_HTTP_PORT)" >&2
+		cat /tmp/mattermost-image-http.log >&2 || true
+		exit 1
+	fi
+	cd $(CURDIR)
+	ADD_HOST=""
+	if [ "$$(uname -s)" = "Linux" ]; then
+		ADD_HOST="--add-host host.docker.internal:host-gateway"
+	fi
+	docker buildx build \
+		--platform $(PLATFORM) \
+		$$ADD_HOST \
+		--build-arg MM_PACKAGE="http://host.docker.internal:$(IMAGE_HTTP_PORT)/$$(basename "$$TARBALL")?v=$$PKG_SUM" \
+		--load \
+		-t "$(IMAGE):$(IMAGE_TAG)" \
+		-f $(SERVER_DIR)/build/Dockerfile \
+		$(SERVER_DIR)/build
+	echo "Built $(IMAGE):$(IMAGE_TAG) ($(PLATFORM))"
+ifeq ($(IMAGE_BUILD_CLIENT),true)
+	echo "Rebuilt webapp/channels/dist; run 'make restart-web' if the dev server is running."
+endif
+
+image-push: ## Push the runtime image built by `make image` to GHCR
+	docker push "$(IMAGE):$(IMAGE_TAG)"
 
 start-web: ## Start the web client in the background (WEB_MODE=watch|dev-server)
 	@mkdir -p $(LOG_DIR)
