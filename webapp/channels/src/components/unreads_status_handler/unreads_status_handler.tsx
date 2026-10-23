@@ -13,11 +13,6 @@ import {basicUnreadMeta} from 'mattermost-redux/selectors/entities/channels';
 import type {BasicUnreadStatus} from 'mattermost-redux/selectors/entities/channels';
 import {ensureString} from 'mattermost-redux/utils/post_utils';
 
-import faviconDefault16x16 from 'images/favicon/favicon-default-16x16.png';
-import faviconDefault24x24 from 'images/favicon/favicon-default-24x24.png';
-import faviconDefault32x32 from 'images/favicon/favicon-default-32x32.png';
-import faviconDefault64x64 from 'images/favicon/favicon-default-64x64.png';
-import faviconDefault96x96 from 'images/favicon/favicon-default-96x96.png';
 import faviconMention16x16 from 'images/favicon/favicon-mentions-16x16.png';
 import faviconMention24x24 from 'images/favicon/favicon-mentions-24x24.png';
 import faviconMention32x32 from 'images/favicon/favicon-mentions-32x32.png';
@@ -30,6 +25,15 @@ import faviconUnread64x64 from 'images/favicon/favicon-unread-64x64.png';
 import faviconUnread96x96 from 'images/favicon/favicon-unread-96x96.png';
 import {Constants} from 'utils/constants';
 import DesktopApp from 'utils/desktop_api';
+
+import {
+    formatBadgeCount,
+    getFaviconLinks,
+    getOriginalFaviconHref,
+    renderBadgedFavicons,
+    restoreFavicons,
+    updateAppBadge,
+} from './unread_badge';
 
 enum BadgeStatus {
     Mention = 'Mention',
@@ -50,16 +54,28 @@ type Props = {
 };
 
 export class UnreadsStatusHandlerClass extends React.PureComponent<Props> {
+    // Incremented on every favicon change so that slower, out of date renders are discarded
+    private faviconRequestId = 0;
+
+    componentDidMount() {
+        // Also clears any badges left over from when this was last mounted
+        this.updateBadges();
+    }
+
     componentDidUpdate(prevProps: Props) {
         this.updateTitle();
-        const oldBadgeStatus = this.getBadgeStatus(prevProps.unreadStatus);
-        const newBadgeStatus = this.getBadgeStatus(this.props.unreadStatus);
 
-        if (oldBadgeStatus !== newBadgeStatus) {
-            this.updateFavicon(newBadgeStatus);
+        if (this.getBadgeKey(prevProps.unreadStatus) !== this.getBadgeKey(this.props.unreadStatus)) {
+            this.updateBadges();
         }
 
         this.updateDesktopApp();
+    }
+
+    componentWillUnmount() {
+        // Discard any pending favicon render. The badges are left as they are, like the title, since this is also
+        // rendered in popouts and the app badge is shared between windows.
+        this.faviconRequestId++;
     }
 
     get isDynamicFaviconSupported() {
@@ -74,6 +90,23 @@ export class UnreadsStatusHandlerClass extends React.PureComponent<Props> {
         }
         return BadgeStatus.None;
     }
+
+    // Identifies what the badges currently show, so that they're only redrawn when that changes
+    getBadgeKey(unreadStatus: BasicUnreadStatus) {
+        const {unreadMentionCount} = basicUnreadMeta(unreadStatus);
+        return `${this.getBadgeStatus(unreadStatus)}:${formatBadgeCount(unreadMentionCount)}`;
+    }
+
+    updateBadges = () => {
+        const {isUnread, unreadMentionCount} = basicUnreadMeta(this.props.unreadStatus);
+
+        this.updateFavicon(this.getBadgeStatus(this.props.unreadStatus), unreadMentionCount);
+
+        // The desktop app sets its own badge through updateDesktopApp
+        if (!UserAgent.isDesktopApp()) {
+            updateAppBadge(isUnread, unreadMentionCount);
+        }
+    };
 
     updateDesktopApp = () => {
         const {unreadStatus} = this.props;
@@ -142,48 +175,50 @@ export class UnreadsStatusHandlerClass extends React.PureComponent<Props> {
         }
     };
 
-    updateFavicon = (badgeStatus: BadgeStatus) => {
-        if (!(UserAgent.isFirefox() || UserAgent.isChrome())) {
+    updateFavicon = (badgeStatus: BadgeStatus, mentionCount: number) => {
+        const requestId = ++this.faviconRequestId;
+
+        if (badgeStatus === BadgeStatus.None) {
+            restoreFavicons();
             return;
         }
 
-        const link = document.querySelector('link[rel="icon"]');
+        renderBadgedFavicons(mentionCount).then((favicons) => {
+            if (requestId === this.faviconRequestId) {
+                for (const [link, href] of favicons) {
+                    link.href = href;
+                }
+            }
+        }).catch(() => {
+            if (requestId === this.faviconRequestId) {
+                this.swapFavicons(badgeStatus);
+            }
+        });
+    };
 
-        if (!link) {
-            return;
-        }
-        const link16x16 = document.querySelector<HTMLLinkElement>('link[rel="icon"][sizes="16x16"]');
-        const link24x24 = document.querySelector<HTMLLinkElement>('link[rel="icon"][sizes="24x24"]');
-        const link32x32 = document.querySelector<HTMLLinkElement>('link[rel="icon"][sizes="32x32"]');
-        const link64x64 = document.querySelector<HTMLLinkElement>('link[rel="icon"][sizes="64x64"]');
-        const link96x96 = document.querySelector<HTMLLinkElement>('link[rel="icon"][sizes="96x96"]');
+    // Fallback for when the badge can't be drawn over the current favicon
+    swapFavicons = (badgeStatus: BadgeStatus.Mention | BadgeStatus.Unread) => {
+        const favicons: Record<string, string> = badgeStatus === BadgeStatus.Mention ? {
+            '16x16': faviconMention16x16,
+            '24x24': faviconMention24x24,
+            '32x32': faviconMention32x32,
+            '64x64': faviconMention64x64,
+            '96x96': faviconMention96x96,
+        } : {
+            '16x16': faviconUnread16x16,
+            '24x24': faviconUnread24x24,
+            '32x32': faviconUnread32x32,
+            '64x64': faviconUnread64x64,
+            '96x96': faviconUnread96x96,
+        };
 
-        const getFavicon = (url: string): string => ensureString(url);
-
-        switch (badgeStatus) {
-        case BadgeStatus.Mention: {
-            link16x16!.href = getFavicon(faviconMention16x16);
-            link24x24!.href = getFavicon(faviconMention24x24);
-            link32x32!.href = getFavicon(faviconMention32x32);
-            link64x64!.href = getFavicon(faviconMention64x64);
-            link96x96!.href = getFavicon(faviconMention96x96);
-            break;
-        }
-        case BadgeStatus.Unread: {
-            link16x16!.href = getFavicon(faviconUnread16x16);
-            link24x24!.href = getFavicon(faviconUnread24x24);
-            link32x32!.href = getFavicon(faviconUnread32x32);
-            link64x64!.href = getFavicon(faviconUnread64x64);
-            link96x96!.href = getFavicon(faviconUnread96x96);
-            break;
-        }
-        default: {
-            link16x16!.href = getFavicon(faviconDefault16x16);
-            link24x24!.href = getFavicon(faviconDefault24x24);
-            link32x32!.href = getFavicon(faviconDefault32x32);
-            link64x64!.href = getFavicon(faviconDefault64x64);
-            link96x96!.href = getFavicon(faviconDefault96x96);
-        }
+        for (const link of getFaviconLinks()) {
+            const favicon = favicons[link.getAttribute('sizes') ?? ''];
+            if (favicon) {
+                // Record the original favicon so that it can be restored later
+                getOriginalFaviconHref(link);
+                link.href = ensureString(favicon);
+            }
         }
     };
 
