@@ -4,6 +4,7 @@
 import React from 'react';
 
 import FilePreviewModal, {computeZoomAtCursor} from 'components/file_preview_modal/file_preview_modal';
+import type {LinkInfo} from 'components/file_preview_modal/types';
 
 import {act, render} from 'tests/react_testing_utils';
 import Constants from 'utils/constants';
@@ -25,6 +26,11 @@ jest.mock('components/code_preview', () => ({
     __esModule: true,
     default: () => <div>{'Code Preview'}</div>,
     hasSupportedLanguage: () => true,
+}));
+jest.mock('components/markdown_preview', () => ({
+    __esModule: true,
+    default: () => <div>{'Markdown Preview'}</div>,
+    isMarkdownFile: jest.requireActual('components/markdown_preview').isMarkdownFile,
 }));
 jest.mock('components/file_info_preview', () => () => <div>{'File Info Preview'}</div>);
 jest.mock('components/loading_image_preview', () => () => <div>{'Loading Image Preview'}</div>);
@@ -104,6 +110,34 @@ describe('components/FilePreviewModal', () => {
             ref.current?.setState({loaded: [true] as any});
         });
         expect(container).toMatchSnapshot();
+    });
+
+    test.each(['md', 'markdown', 'mkd', 'mkdown'])('should render MarkdownPreview for loaded .%s file', (extension) => {
+        const fileInfos = [TestHelper.getFileInfoMock({id: 'file_id', extension, name: `readme.${extension}`})];
+        const props = {...baseProps, fileInfos};
+        const {container, ref} = renderModal(props);
+        act(() => {
+            ref.current?.setState({loaded: [true] as any});
+        });
+        expect(container).toHaveTextContent('Markdown Preview');
+        expect(container).not.toHaveTextContent('Code Preview');
+    });
+
+    test('should not use MarkdownPreview for an external LinkInfo markdown file', () => {
+        const linkInfo: LinkInfo = {has_preview_image: false, link: 'https://example.com/readme.md', extension: 'md', name: 'readme.md'};
+        const ref = React.createRef<FilePreviewModal>();
+        const {container} = render(
+            <FilePreviewModal
+                ref={ref}
+                {...baseProps}
+                fileInfos={[linkInfo]}
+            />,
+        );
+        act(() => {
+            ref.current?.setState({loaded: [true] as any});
+        });
+        expect(container).not.toHaveTextContent('Markdown Preview');
+        expect(container).toHaveTextContent('Code Preview');
     });
 
     test('should match snapshot, loaded with other file', () => {
