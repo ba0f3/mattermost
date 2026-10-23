@@ -24,8 +24,6 @@ on:
         required: true
       PR_BUILDS_BUCKET_AWS_SECRET_ACCESS_KEY:
         required: true
-      DOCKERHUB_DEV_TOKEN:
-        required: true
       WIZ_DEVOPS_CLIENT_ID:
         required: true
       WIZ_DEVOPS_CLIENT_SECRET:
@@ -108,6 +106,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      packages: write
     runs-on: ubuntu-22.04
     needs:
       - upload-artifacts
@@ -117,8 +116,9 @@ jobs:
       - name: cd/docker-login
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
-          username: mattermostdev
-          password: ${{ secrets.DOCKERHUB_DEV_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: cd/checkout-build-files
         if: inputs.head-repository != github.repository
@@ -159,30 +159,44 @@ jobs:
           TAG: ${{ steps.set_tag.outputs.TAG }}
         run: |
           cd server/build
-          docker buildx build --no-cache --platform linux/amd64 --push --build-arg MM_PACKAGE=${MM_PACKAGE} -t mattermostdevelopment/mm-te-test:${TAG} -t mattermostdevelopment/mattermost-team-edition:${TAG} .
-          echo "DOCKERHUB_IMAGE_DIGEST=$(cosign triangulate mattermostdevelopment/mattermost-team-edition:${TAG} | cut -d: -f2 | sed 's/\.sig$//' | tr '-' ':')" >> "${GITHUB_OUTPUT}"
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          image="ghcr.io/${owner}"
+          docker buildx build --no-cache --platform linux/amd64 --push --build-arg MM_PACKAGE=${MM_PACKAGE} -t ${image}/mm-te-test:${TAG} -t ${image}/mattermost-team-edition:${TAG} .
+          echo "IMAGE_DIGEST=$(cosign triangulate ${image}/mattermost-team-edition:${TAG} | cut -d: -f2 | sed 's/\.sig$//' | tr '-' ':')" >> "${GITHUB_OUTPUT}"
 
       - name: cd/generate-summary
         env:
-          DOCKERHUB_IMAGE_DIGEST: ${{ steps.docker.outputs.DOCKERHUB_IMAGE_DIGEST }}
+          IMAGE_DIGEST: ${{ steps.docker.outputs.IMAGE_DIGEST }}
           TAG: ${{ steps.set_tag.outputs.TAG }}
           WORKFLOW_RUN_HEAD_SHA: ${{ inputs.head-sha }}
         run: |
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          image="ghcr.io/${owner}/mattermost-team-edition"
           echo "### Docker Image for Mattermost team package" >> "${GITHUB_STEP_SUMMARY}"
           echo " " >> "${GITHUB_STEP_SUMMARY}"
           echo "Mattermost Repo SHA: \`${WORKFLOW_RUN_HEAD_SHA}\`" >> "${GITHUB_STEP_SUMMARY}"
           echo " " >> "${GITHUB_STEP_SUMMARY}"
-          echo "Docker Image: \`mattermostdevelopment/mattermost-team-edition:${TAG}\`" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Image Digest: \`${DOCKERHUB_IMAGE_DIGEST}\`" >> "${GITHUB_STEP_SUMMARY}"
-          echo "Secure Image: \`mattermostdevelopment/mattermost-team-edition:${TAG}@${DOCKERHUB_IMAGE_DIGEST}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Docker Image: \`${image}:${TAG}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Image Digest: \`${IMAGE_DIGEST}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Secure Image: \`${image}:${TAG}@${IMAGE_DIGEST}\`" >> "${GITHUB_STEP_SUMMARY}"
 
   scan-docker-image:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
     needs:
       - build-docker
     env:
       POLICY: "DevOps Vulnerabilities Policy"
     steps:
+      - name: cd/docker-login
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
       - name: cd/setup-wizcli
         run: |
           curl -o wizcli https://downloads.wiz.io/wizcli/latest/wizcli-linux-amd64
@@ -196,13 +210,15 @@ jobs:
         env:
           DOCKER_TAG: ${{ needs.build-docker.outputs.TAG }}
         run: |
-          docker pull "mattermostdevelopment/mattermost-team-edition:${DOCKER_TAG}"
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          docker pull "ghcr.io/${owner}/mattermost-team-edition:${DOCKER_TAG}"
 
       - name: cd/scan-image
         env:
           DOCKER_TAG: ${{ needs.build-docker.outputs.TAG }}
         run: |
-          ./wizcli docker scan --image "mattermostdevelopment/mattermost-team-edition:${DOCKER_TAG}" --policy "$POLICY"
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          ./wizcli docker scan --image "ghcr.io/${owner}/mattermost-team-edition:${DOCKER_TAG}" --policy "$POLICY"
 
   update-failure-final-status:
     permissions:

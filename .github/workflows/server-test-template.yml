@@ -69,15 +69,11 @@ on:
       # Only if enablecoverage is true
       CODECOV_TOKEN:
         required: false
-      # Only if fips-enabled is true
-      DOCKERHUB_USERNAME:
-        required: false
-      DOCKERHUB_TOKEN:
-        required: false
 
 permissions:
   contents: read
   actions: read    # for load-buildenv artifact listing
+  packages: read   # for pulling the buildenv image from GHCR
 
 jobs:
   test:
@@ -99,12 +95,14 @@ jobs:
       INPUT_TEST_TARGET: ${{ inputs.test-target }}
     steps:
       - name: buildenv/docker-login
-        # Only FIPS requires login for private build container. (Forks won't have credentials.)
+        # FIPS images are private; GHCR login is optional for public images.
         if: inputs.fips-enabled
+        continue-on-error: true
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: Checkout mattermost project
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

@@ -16,7 +16,7 @@ inputs:
 
 outputs:
   image:
-    description: "Fully-qualified build image name (e.g. mattermost/mattermost-build-server:go1.26.3-node24.11.1)."
+    description: "Fully-qualified build image name (e.g. ghcr.io/<owner>/mattermost-build-server:go1.26.3-node24.11.1)."
     value: ${{ steps.resolve.outputs.image }}
 
 runs:
@@ -52,6 +52,13 @@ runs:
       if: ${{ inputs.fips-enabled == 'true' && steps.download-fips.outcome == 'success' }}
       shell: bash
       run: docker load -i "${BUILDENV_TMPDIR}/image-fips.tar.gz"
+    - name: GHCR login
+      continue-on-error: true
+      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     - name: Resolve image name
       id: resolve
       shell: bash
@@ -59,8 +66,9 @@ runs:
         FIPS: ${{ inputs.fips-enabled }}
         TAG: ${{ inputs.build-server-tag }}
       run: |
+        owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
         if [[ "${FIPS}" == 'true' ]]; then
-          echo "image=mattermost/mattermost-build-server-fips:${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "image=ghcr.io/${owner}/mattermost-build-server-fips:${TAG}" >> "${GITHUB_OUTPUT}"
         else
-          echo "image=mattermost/mattermost-build-server:${TAG}" >> "${GITHUB_OUTPUT}"
+          echo "image=ghcr.io/${owner}/mattermost-build-server:${TAG}" >> "${GITHUB_OUTPUT}"
         fi

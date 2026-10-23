@@ -3,16 +3,10 @@
 name: i18n CI Template
 on:
   workflow_call:
-    secrets:
-      # Only the FIPS half of setup-buildenv needs these, and it is skipped on
-      # fork PRs, so they are optional.
-      DOCKERHUB_USERNAME:
-        required: false
-      DOCKERHUB_TOKEN:
-        required: false
 
 permissions:
   contents: read
+  packages: read
 
 # Translations used to arrive exclusively through Weblate, so this workflow's
 # only job failed any PR that touched a non-English file unless it came from the
@@ -30,6 +24,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      packages: read
       id-token: write  # for chainguard (FIPS base image pull)
     outputs:
       build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}
@@ -49,8 +44,6 @@ jobs:
       - name: ci/setup-buildenv
         env:
           CHAINCTL_IDENTITY: ee399b4c72dd4e58e3d617f78fc47b74733c9557/922f2d48307d6f5f
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         uses: ./.github/actions/setup-buildenv
         with:
           build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}

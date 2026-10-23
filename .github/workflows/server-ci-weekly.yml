@@ -20,11 +20,16 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   buildenv:
     name: Build Environment
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
     outputs:
       build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}
     steps:
@@ -38,6 +43,12 @@ jobs:
         run: |
           tag=$(./build/buildenv-tag.sh)
           echo "BUILD_SERVER_TAG=${tag}" >> "${GITHUB_OUTPUT}"
+      - name: Setup build environment
+        env:
+          CHAINCTL_IDENTITY: ee399b4c72dd4e58e3d617f78fc47b74733c9557/922f2d48307d6f5f
+        uses: ./.github/actions/setup-buildenv
+        with:
+          build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}
 
   test-postgres-binary:
     name: Postgres with binary parameters
@@ -45,6 +56,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
     with:
       name: Postgres with binary parameters
@@ -60,14 +72,13 @@ jobs:
 
   test-postgres-normal-fips:
     name: Postgres FIPS
+    if: github.repository_owner == 'mattermost'
     needs: buildenv
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     with:
       name: Postgres FIPS
       datasource: postgres://mmuser:mostest_password@postgres:5432/mattermost_test?sslmode=disable&connect_timeout=10
@@ -80,14 +91,14 @@ jobs:
 
   test-mmctl-fips:
     name: Run mmctl tests (FIPS)
+    if: github.repository_owner == 'mattermost'
     needs: buildenv
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/mmctl-test-template.yml
     secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       MM_E2E_ZEPHYR_API_KEY: ${{ secrets.MM_E2E_ZEPHYR_API_KEY }}
     with:
       name: mmctl

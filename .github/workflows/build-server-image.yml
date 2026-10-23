@@ -33,6 +33,7 @@ jobs:
   build-image:
     permissions:
       contents: read
+      packages: write
     runs-on: ubuntu-22.04
     steps:
       - name: buildenv/checkout-repo
@@ -40,11 +41,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: buildenv/image-name
+        id: image
+        run: |
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${owner}/mattermost-build-server" >> "${GITHUB_OUTPUT}"
+
       - name: buildenv/docker-login
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: buildenv/build
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
@@ -54,11 +62,11 @@ jobs:
           load: true
           push: false
           pull: false
-          tags: mattermost/mattermost-build-server:test
+          tags: ${{ steps.image.outputs.name }}:test
 
       - name: buildenv/test
         run: |
-          docker run --rm mattermost/mattermost-build-server:test /bin/sh -c "go version && node --version"
+          docker run --rm ${{ steps.image.outputs.name }}:test /bin/sh -c "go version && node --version"
 
       - name: buildenv/calculate-tag
         id: tag
@@ -75,12 +83,15 @@ jobs:
           load: false
           push: true
           pull: true
-          tags: mattermost/mattermost-build-server:${{ steps.tag.outputs.TAG }}
+          tags: ${{ steps.image.outputs.name }}:${{ steps.tag.outputs.TAG }}
 
   build-image-fips:
+    # FIPS images are built with Mattermost's private Chainguard identity.
+    if: github.repository_owner == 'mattermost'
     permissions:
       contents: read
       id-token: write
+      packages: write
     runs-on: ubuntu-22.04
     steps:
       - uses: chainguard-dev/setup-chainctl@c125f765e82b09a42af3185f3214465314d75c5d # v0.5.0
@@ -91,11 +102,18 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: buildenv/image-name
+        id: image
+        run: |
+          owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
+          echo "name=ghcr.io/${owner}/mattermost-build-server-fips" >> "${GITHUB_OUTPUT}"
+
       - name: buildenv/docker-login
         uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
 
       - name: buildenv/build
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v7.0.0
@@ -105,11 +123,11 @@ jobs:
           load: true
           push: false
           pull: false
-          tags: mattermost/mattermost-build-server-fips:test
+          tags: ${{ steps.image.outputs.name }}:test
 
       - name: buildenv/test
         run: |
-          docker run --rm --entrypoint bash mattermost/mattermost-build-server-fips:test -c "go version && node --version"
+          docker run --rm --entrypoint bash ${{ steps.image.outputs.name }}:test -c "go version && node --version"
 
       - name: buildenv/calculate-tag
         id: tag
@@ -126,4 +144,4 @@ jobs:
           load: false
           push: true
           pull: true
-          tags: mattermost/mattermost-build-server-fips:${{ steps.tag.outputs.TAG }}
+          tags: ${{ steps.image.outputs.name }}:${{ steps.tag.outputs.TAG }}

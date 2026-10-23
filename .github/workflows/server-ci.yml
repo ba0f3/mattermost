@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   buildenv:
@@ -27,6 +28,7 @@ jobs:
       contents: read
       pull-requests: read
       actions: write
+      packages: read
       id-token: write  # for chainguard (FIPS base image pull)
     outputs:
       build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}
@@ -74,8 +76,6 @@ jobs:
       - name: Setup build environment
         env:
           CHAINCTL_IDENTITY: ee399b4c72dd4e58e3d617f78fc47b74733c9557/922f2d48307d6f5f
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         uses: ./.github/actions/setup-buildenv
         with:
           build-server-tag: ${{ steps.calculate.outputs.BUILD_SERVER_TAG }}
@@ -187,6 +187,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -209,6 +210,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-merge-template.yml
     with:
       artifact-pattern: postgres-server-test-logs-shard-*
@@ -223,6 +225,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
     with:
       name: Elasticsearch v8 Compatibility
@@ -241,6 +244,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
     with:
       name: OpenSearch v2 Compatibility
@@ -256,6 +260,7 @@ jobs:
   # Sharded for fast iteration. Weekly workflow provides regular full coverage.
   test-postgres-normal-fips:
     if: >-
+      github.repository_owner == 'mattermost' &&
       needs.buildenv.outputs.relevant-changed == 'true' &&
       (contains(github.head_ref, 'fips') || needs.buildenv.outputs.gomod-changed == 'true')
     name: "Postgres FIPS (shard ${{ matrix.shard }})"
@@ -267,10 +272,8 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-template.yml
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     with:
       name: "Postgres FIPS (shard ${{ matrix.shard }})"
       datasource: postgres://mmuser:mostest_password@postgres:5432/mattermost_test?sslmode=disable&connect_timeout=10
@@ -287,6 +290,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/server-test-merge-template.yml
     with:
       artifact-pattern: postgres-server-fips-test-logs-shard-*
@@ -299,6 +303,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/mmctl-test-template.yml
     secrets:
       MM_E2E_ZEPHYR_API_KEY: ${{ secrets.MM_E2E_ZEPHYR_API_KEY }}
@@ -311,6 +316,7 @@ jobs:
       fips-enabled: false
   test-mmctl-fips:
     if: >-
+      github.repository_owner == 'mattermost' &&
       needs.buildenv.outputs.relevant-changed == 'true' &&
       (contains(github.head_ref, 'fips') || needs.buildenv.outputs.gomod-changed == 'true')
     name: Run mmctl tests (FIPS)
@@ -318,10 +324,9 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     uses: ./.github/workflows/mmctl-test-template.yml
     secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       MM_E2E_ZEPHYR_API_KEY: ${{ secrets.MM_E2E_ZEPHYR_API_KEY }}
     with:
       name: mmctl
@@ -338,6 +343,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      packages: read
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout mattermost project
@@ -435,7 +441,7 @@ jobs:
     # Skip when no relevant Server CI paths changed, since build-mattermost-server
     # (and thus server-dist-artifact) will not have run.
     if: >-
-      success('ci-complete') &&
+      success() &&
       needs.buildenv.outputs.relevant-changed == 'true' &&
       github.repository_owner == 'mattermost' &&
       github.event_name == 'pull_request' &&
@@ -444,6 +450,7 @@ jobs:
       contents: read
       actions: read
       statuses: write
+      packages: write
     needs:
       - buildenv
       - ci-complete
@@ -451,7 +458,6 @@ jobs:
     secrets:
       PR_BUILDS_BUCKET_AWS_ACCESS_KEY_ID: ${{ secrets.PR_BUILDS_BUCKET_AWS_ACCESS_KEY_ID }}
       PR_BUILDS_BUCKET_AWS_SECRET_ACCESS_KEY: ${{ secrets.PR_BUILDS_BUCKET_AWS_SECRET_ACCESS_KEY }}
-      DOCKERHUB_DEV_TOKEN: ${{ secrets.DOCKERHUB_DEV_TOKEN }}
       WIZ_DEVOPS_CLIENT_ID: ${{ secrets.WIZ_DEVOPS_CLIENT_ID }}
       WIZ_DEVOPS_CLIENT_SECRET: ${{ secrets.WIZ_DEVOPS_CLIENT_SECRET }}
     with:

@@ -1,8 +1,9 @@
 name: Setup build environment
 description: >
-  Builds the mattermost-build-server images if they don't yet exist on Docker
-  Hub (e.g. during a Go or Node version bump), and uploads them as artifacts
-  for downstream jobs. Run once per workflow before any build or test jobs.
+  Builds the mattermost-build-server images if they don't yet exist in
+  GitHub Container Registry (e.g. during a Go or Node version bump), and
+  uploads them as artifacts for downstream jobs. Run once per workflow before
+  any build or test jobs.
 
 inputs:
   build-server-tag:
@@ -24,13 +25,22 @@ runs:
       id: constants
       shell: bash
       run: |
+        owner=$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')
         {
-          echo "image=mattermost/mattermost-build-server"
+          echo "image=ghcr.io/${owner}/mattermost-build-server"
           echo "artifact=buildenv-image"
-          echo "fips-image=mattermost/mattermost-build-server-fips"
+          echo "fips-image=ghcr.io/${owner}/mattermost-build-server-fips"
           echo "fips-artifact=buildenv-fips-image"
           echo "tmpdir=/tmp/buildenv-save"
         } >> "${GITHUB_OUTPUT}"
+    - name: GHCR login
+      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      continue-on-error: true
+      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ github.token }}
     # ── Regular ────────────────────────────────────────────────────────
     - name: Resolve regular image
       id: resolve
@@ -66,21 +76,15 @@ runs:
         name: ${{ steps.constants.outputs.artifact }}
         path: ${{ steps.constants.outputs.tmpdir }}/image.tar.gz
         retention-days: 1
-    # ── FIPS (skipped on fork PRs) ─────────────────────────────────────
-    - name: Docker Hub login
-      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-      uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
-      with:
-        username: ${{ env.DOCKERHUB_USERNAME }}
-        password: ${{ env.DOCKERHUB_TOKEN }}
+    # ── FIPS (skipped on non-upstream repos) ───────────────────────────
     - name: Setup Chainctl
-      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      if: ${{ github.repository_owner == 'mattermost' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
       uses: chainguard-dev/setup-chainctl@c125f765e82b09a42af3185f3214465314d75c5d # v0.5.0
       with:
         identity: ${{ env.CHAINCTL_IDENTITY }}
     - name: Resolve FIPS image
       id: resolve-fips
-      if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      if: ${{ github.repository_owner == 'mattermost' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
       shell: bash
       env:
         BUILDENV_FIPS_IMAGE: ${{ steps.constants.outputs.fips-image }}
