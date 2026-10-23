@@ -1,95 +1,288 @@
-# [![Mattermost logo](https://user-images.githubusercontent.com/7205829/137170381-fe86eef0-bccc-4fdd-8e92-b258884ebdd7.png)](https://mattermost.com)
+# Mattermost (dev fork)
 
-[Mattermost](https://mattermost.com) is an open core, self-hosted collaboration platform that offers chat, workflow automation, voice calling, screen sharing, and AI integration. This repo is the primary source for core development on the Mattermost platform; it's written in Go and React, runs as a single Linux binary, and relies on PostgreSQL. A new compiled version is released under an MIT license every month on the 16th.
+This repository is a Mattermost development fork. It contains the Go server and React
+web client, plus a root `Makefile` that wraps the development workflow:
 
-[Deploy Mattermost on-premises](https://mattermost.com/deploy/?utm_source=github-mattermost-server-readme), or [try it for free in the cloud](https://mattermost.com/sign-up/?utm_source=github-mattermost-server-readme).
+- start/stop the local dev environment (server + web client + Docker services)
+- create a local admin and install the Agents plugin
+- build a production runtime image for **linux/amd64** and push it to GHCR
 
-<img width="1006" alt="mattermost user interface" src="https://user-images.githubusercontent.com/7205829/136107976-7a894c9e-290a-490d-8501-e5fdbfc3785a.png">
+The upstream project documentation is still the reference for Mattermost features and
+configuration: <https://docs.mattermost.com/>.
 
-Learn more about the following use cases with Mattermost:
+## Requirements
 
-- [DevSecOps](https://mattermost.com/solutions/use-cases/devops/?utm_source=github-mattermost-server-readme)
-- [Incident Resolution](https://mattermost.com/solutions/use-cases/incident-resolution/?utm_source=github-mattermost-server-readme)
-- [IT Service Desk](https://mattermost.com/solutions/use-cases/it-service-desk/?utm_source=github-mattermost-server-readme)
+| Tool | Version / notes |
+|---|---|
+| Go | 1.26.7+ (`server/.go-version`) |
+| Node | **24.11.1** and npm **11.6.2** — exact pins, `webapp/.npmrc` uses `engine-strict=true` |
+| Docker | Docker Engine with Compose v2 and `docker buildx` |
+| Other | `git`, `make`, `curl`, `python3`, `openssl` |
 
-Other useful resources:
+The root `Makefile` automatically prefers a locally installed Node at
+`~/.local/share/mattermost/node/bin`. To install that exact toolchain on Linux:
 
-- [Download and Install Mattermost](https://docs.mattermost.com/guides/deployment.html) - Install, setup, and configure your own Mattermost instance.
-- [Product documentation](https://docs.mattermost.com/) - Learn how to run a Mattermost instance and take advantage of all the features.
-- [Developer documentation](https://developers.mattermost.com/) - Contribute code to Mattermost or build an integration via APIs, Webhooks, slash commands, Apps, and plugins.
+```bash
+NODE_VERSION=24.11.1
+case "$(uname -m)" in
+  x86_64) NODE_ARCH=x64 ;;
+  aarch64|arm64) NODE_ARCH=arm64 ;;
+  *) echo "unsupported arch"; exit 1 ;;
+esac
 
-Table of contents
-=================
+mkdir -p "$HOME/.local/share/mattermost"
+curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
+  | tar -xJ -C "$HOME/.local/share/mattermost"
+ln -sfn "$HOME/.local/share/mattermost/node-v${NODE_VERSION}-linux-${NODE_ARCH}" \
+  "$HOME/.local/share/mattermost/node"
+```
 
-- [Install Mattermost](#install-mattermost)
-- [Native mobile and desktop apps](#native-mobile-and-desktop-apps)
-- [Get security bulletins](#get-security-bulletins)
-- [Get involved](#get-involved)
-- [Learn more](#learn-more)
-- [License](#license)
-- [Get the latest news](#get-the-latest-news)
-- [Contributing](#contributing)
+Alternatively install Node 24.11.1 with `nvm`, `fnm`, or `mise`; do not use a newer
+Node with this webapp, npm will refuse to install (`EBADENGINE`).
 
-## Install Mattermost
+## Quick start
 
-- [Download and Install Mattermost Self-Hosted](https://docs.mattermost.com/guides/deployment.html) - Deploy a Mattermost Self-hosted instance in minutes via Docker, Ubuntu, or tar.
-- [Get started in the cloud](https://mattermost.com/sign-up/?utm_source=github-mattermost-server-readme) to try Mattermost today.
-- [Developer machine setup](https://developers.mattermost.com/contribute/server/developer-setup) - Follow this guide if you want to write code for Mattermost.
+```bash
+cp .env.example .env
+# edit .env at least DEV_ADMIN_PASSWORD; optionally OIDC and LLM settings
 
+make deps      # start postgres (pgvector), redis, inbucket
+make start     # start server + web client in the background
+make status    # wait until the app reports "running"
+make admin     # create DEV_ADMIN_USERNAME / DEV_ADMIN_PASSWORD
+make plugin-install   # optional: build & deploy the Agents plugin
+```
 
-Other install guides:
+Open `MM_SERVICESETTINGS_SITEURL` from `.env` (default `http://localhost:8065`).
 
-- [Deploy Mattermost on Docker](https://docs.mattermost.com/install/install-docker.html)
-- [Mattermost Omnibus](https://docs.mattermost.com/install/installing-mattermost-omnibus.html)
-- [Install Mattermost from Tar](https://docs.mattermost.com/install/install-tar.html)
-- [Ubuntu 20.04 LTS](https://docs.mattermost.com/install/installing-ubuntu-2004-LTS.html)
-- [Kubernetes](https://docs.mattermost.com/install/install-kubernetes.html)
-- [Helm](https://docs.mattermost.com/install/install-kubernetes.html#installing-the-operators-via-helm)
-- [More server install guides](https://docs.mattermost.com/guides/deployment.html)
+The first `make start` is slow: it runs `npm install` for the webapp and compiles the
+Go server. Follow progress with:
 
-## Native mobile and desktop apps
+```bash
+make logs       # app + web
+make logs-app
+make logs-web
+```
 
-In addition to the web interface, you can also download Mattermost clients for [Android](https://mattermost.com/pl/android-app/), [iOS](https://mattermost.com/pl/ios-app/), [Windows PC](https://docs.mattermost.com/install/desktop-app-install.html#windows-10-windows-8-1), [macOS](https://docs.mattermost.com/install/desktop-app-install.html#macos-10-9), and [Linux](https://docs.mattermost.com/install/desktop-app-install.html#linux).
+## Configuration (`.env`)
 
-[<img src="https://user-images.githubusercontent.com/30978331/272826427-6200c98f-7319-42c3-86d4-0b33ae99e01a.png" alt="Get Mattermost on Google Play" height="50px"/>](https://mattermost.com/pl/android-app/)  [<img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Get Mattermost on the App Store" height="50px"/>](https://itunes.apple.com/us/app/mattermost/id1257222717?mt=8)  [![Get Mattermost on Windows PC](https://user-images.githubusercontent.com/33878967/33095357-39cab8d2-ceb8-11e7-89a6-67dccc571ca3.png)](https://docs.mattermost.com/install/desktop.html#windows-10-windows-8-1-windows-7)  [![Get Mattermost on Mac OSX](https://user-images.githubusercontent.com/33878967/33095355-39a36f2a-ceb8-11e7-9b33-73d4f6d5d6c1.png)](https://docs.mattermost.com/install/desktop.html#macos-10-9)  [![Get Mattermost on Linux](https://user-images.githubusercontent.com/33878967/33095354-3990e256-ceb8-11e7-965d-b00a16e578de.png)](https://docs.mattermost.com/install/desktop.html#linux)
+`.env` is gitignored and sourced by the Makefile with `set -a`, so every value reaches
+the server and the sub-Makefiles. `.env.example` documents all supported variables.
 
-## Get security bulletins
+Key values:
 
-Receive notifications of critical security updates. The sophistication of online attackers is perpetually increasing. If you're deploying Mattermost it's highly recommended you subscribe to the Mattermost Security Bulletin mailing list for updates on critical security releases.
+| Variable | Purpose |
+|---|---|
+| `MM_SERVICESETTINGS_SITEURL` | Public URL of the dev server (`http://localhost:8065`) |
+| `MM_SQLSETTINGS_DATASOURCE` | Postgres DSN used by the server |
+| `ENABLED_DOCKER_SERVICES` | Docker services started by `make deps` / `make start` |
+| `MM_USE_PGVECTOR` | Use the `pgvector/pgvector` Postgres image |
+| `MM_PLUGINSETTINGS_ENABLEUPLOADS` | Allow plugin deployment from the API |
+| `DEV_ADMIN_*` | Local admin created by `make admin` |
+| `MM_OPENIDSETTINGS_*` | External OpenID Connect provider |
+| `DEV_LLM_*` | Notes for seeding an OpenAI-compatible service (the plugin stores LLM config in its own config, not in `.env`) |
 
-[Subscribe here](https://mattermost.com/security-updates/#sign-up)
+Notes:
 
-## Get involved
+- If host port `5432` is already used by another project, add a gitignored
+  `server/docker-compose.override.yaml` that publishes Postgres on another port, and
+  update the DSN in `.env`. Example:
 
-- [Contribute to Mattermost](https://handbook.mattermost.com/contributors/contributors/ways-to-contribute)
-- [Find "Help Wanted" projects](https://github.com/mattermost/mattermost-server/issues?page=1&q=is%3Aissue+is%3Aopen+%22Help+Wanted%22&utf8=%E2%9C%93)
-- [Join Developer Discussion on a Mattermost server for contributors](https://community.mattermost.com/signup_user_complete/?id=f1924a8db44ff3bb41c96424cdc20676)
-- [Get Help With Mattermost](https://docs.mattermost.com/guides/get-help.html)
+  ```yaml
+  services:
+    postgres:
+      ports: !override
+        - "5433:5432"
+  ```
 
-## Learn more
+- OpenID Connect requires an Enterprise Edition build plus the private enterprise
+  module. The default Team/sourceavailable build does not include the OpenID provider,
+  even if the `MM_OPENIDSETTINGS_*` variables are set.
+- The Agents plugin is configured in **System Console → Plugins → Agents**
+  (`Add an AI Service`). `DEV_LLM_*` in `.env` is only a convenience for local
+  tooling; the plugin does not read it directly.
 
-- [API options - webhooks, slash commands, drivers, and web service](https://api.mattermost.com/)
-- [See who's using Mattermost](https://mattermost.com/customers/)
-- [Browse over 700 Mattermost integrations](https://mattermost.com/marketplace/)
+## Development server
+
+```bash
+make start              # app + web, background
+make status             # app/web state and URLs
+make stop               # stop web + app; Docker services stay up
+make stop-all           # also stop Docker services
+make restart            # stop + start both
+make restart-app        # rebuild/restart the Go server
+make restart-web        # restart the web client
+```
+
+The web client runs in webpack watch mode and rebuilds automatically when files under
+`webapp/` change. The Go server is not watched; restart it after changing Go code:
+
+```bash
+make restart-app
+```
+
+Web modes:
+
+```bash
+make start-web                        # webpack --watch, served by the app on :8065
+make start-web WEB_MODE=dev-server    # webpack-dev-server + HMR on :9005
+```
+
+`start-app` / `start-web` only start a process if it is not already running. They do
+not rebuild an already-running server; use `restart-*` for that.
+
+### Admin and plugins
+
+```bash
+make admin            # creates DEV_ADMIN_USERNAME with DEV_ADMIN_PASSWORD
+make plugin-install   # clones PLUGIN_GIT_URL, builds and deploys the Agents plugin
+```
+
+`make admin` uses `mmctl --local`, so the app must be running and
+`MM_SERVICESETTINGS_ENABLELOCALMODE=true` must be set (default in `.env.example`).
+`make plugin-install` deploys with `MM_SERVICESETTINGS_ENABLEDEVELOPER=true` and uses
+`DEV_ADMIN_USERNAME` / `DEV_ADMIN_PASSWORD`.
+
+Overrides:
+
+```bash
+make plugin-install PLUGIN_DIR=../my-plugin
+make plugin-install PLUGIN_GIT_URL=https://github.com/org/my-plugin.git
+```
+
+### Building the server manually
+
+`make start-app` uses `go run` and compiles from source. To produce binaries without
+starting the server:
+
+```bash
+cd server
+make build-linux-amd64
+# amd64 host:  server/bin/mattermost, server/bin/mmctl
+# arm64 host:  server/bin/linux_amd64/mattermost, server/bin/linux_amd64/mmctl
+```
+
+For the web client:
+
+```bash
+make -C webapp dist   # production build into webapp/channels/dist
+```
+
+## Build a production image
+
+```bash
+make image
+```
+
+Defaults:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `IMAGE` | `ghcr.io/<git-remote-owner>/mattermost-team-edition` | Image repository |
+| `IMAGE_TAG` | `dev` | Image tag |
+| `PLATFORM` | `linux/amd64` | Target platform |
+| `IMAGE_BUILD_CLIENT` | `true` | Rebuild the production web client first |
+| `IMAGE_HTTP_PORT` | `18765` | Temporary local port used to feed the package to Docker |
+
+What `make image` does:
+
+1. cross-compiles the server for `linux/amd64` (works on arm64 hosts);
+2. builds the production web client unless `IMAGE_BUILD_CLIENT=false`;
+3. packages Mattermost (`server/dist/mattermost-team-linux-amd64.tar.gz`);
+4. builds `server/build/Dockerfile` with `docker buildx --platform linux/amd64` and
+   loads the image locally.
+
+Examples:
+
+```bash
+# custom tag and repository
+make image IMAGE=ghcr.io/ba0f3/mattermost-team-edition IMAGE_TAG=12.1.0
+
+# reuse the existing dev webapp dist (faster, larger image)
+make image IMAGE_BUILD_CLIENT=false
+
+# build for another platform
+make image PLATFORM=linux/arm64
+```
+
+Push to GHCR (requires a token with `write:packages`):
+
+```bash
+docker login ghcr.io
+make image-push IMAGE=ghcr.io/ba0f3/mattermost-team-edition IMAGE_TAG=12.1.0
+```
+
+Notes:
+
+- Building `linux/amd64` on an arm64 Linux host needs binfmt/QEMU for the Ubuntu
+  builder stage:
+
+  ```bash
+  docker run --privileged --rm tonistiigi/binfmt --install amd64
+  ```
+
+  Docker Desktop (Apple Silicon) includes this automatically.
+- `IMAGE_BUILD_CLIENT=true` replaces `webapp/channels/dist` with a production build.
+  If the dev server is running, restart the web client afterwards:
+  `make restart-web`.
+- The image does not bundle prepackaged plugins (`package-linux-amd64` runs with an
+  empty `PLUGIN_PACKAGES`); install the Agents plugin after deployment.
+- The runtime image runs as the `mattermost` user and exposes ports `8065`, `8067`,
+  and `8074`.
+
+To run the image, set `MATTERMOST_IMAGE` in the production Compose file, for example:
+
+```bash
+export MATTERMOST_IMAGE=ghcr.io/ba0f3/mattermost-team-edition:12.1.0
+export MM_SERVICESETTINGS_SITEURL=https://chat.example.com
+docker compose -f deploy/production/docker-compose.yml up -d
+```
+
+## Make targets
+
+| Target | Description |
+|---|---|
+| `make help` | List all targets |
+| `make deps` | Start Docker services only |
+| `make start` / `make stop` / `make restart` | Manage app + web |
+| `make start-app` / `stop-app` / `restart-app` | Manage the Go server |
+| `make start-web` / `stop-web` / `restart-web` | Manage the web client |
+| `make status` | Show app/web state and URLs |
+| `make logs` / `logs-app` / `logs-web` | Follow logs |
+| `make admin` | Create the local admin user |
+| `make plugin-install` | Build and deploy the Agents plugin |
+| `make stop-all` | Stop app, web and Docker services |
+| `make image` | Build the runtime image |
+| `make image-push` | Push the runtime image |
+
+## Troubleshooting
+
+**`npm install` fails with `EBADENGINE`** — install Node 24.11.1 exactly (see
+Requirements). The Makefile prefers `~/.local/share/mattermost/node/bin`.
+
+**`server/client/root.html: no such file or directory`** — the web client has not been
+built yet. Check `make logs-web`; the first build takes a few minutes. If it is already
+built, restart the server so the client symlink is refreshed:
+`make restart-app`.
+
+**Plugin menus / App bar disappear** — plugin webapp bundles under
+`webapp/channels/dist/plugins` can be removed by a webapp rebuild. Restart the app to
+copy them again:
+
+```bash
+make restart-app
+curl -o /dev/null -w '%{http_code}\n' \
+  http://localhost:8065/static/plugins/mattermost-ai/<bundle>.js
+```
+
+**Port already in use** — change the host port in
+`server/docker-compose.override.yaml` (Postgres) or override `MM_SERVICESETTINGS_*`
+ports in `.env`.
 
 ## License
 
-See the [LICENSE file](LICENSE.txt) for license rights and limitations.
+See [LICENSE.txt](LICENSE.txt). Upstream Mattermost resources:
 
-## Get the latest news
-
-- **X** - Follow [Mattermost on X, formerly Twitter](https://twitter.com/mattermost).
-- **Blog** - Get the latest updates from the [Mattermost blog](https://mattermost.com/blog/).
-- **Facebook** - Follow [Mattermost on Facebook](https://www.facebook.com/MattermostHQ).
-- **LinkedIn** - Follow [Mattermost on LinkedIn](https://www.linkedin.com/company/mattermost/).
-- **Email** - Subscribe to our [newsletter](https://mattermost.us11.list-manage.com/subscribe?u=6cdba22349ae374e188e7ab8e&id=2add1c8034) (1 or 2 per month).
-- **Mattermost** - Join the ~contributors channel on [the Mattermost Community Server](https://community.mattermost.com).
-- **IRC** - Join the #matterbridge channel on [Freenode](https://freenode.net/) (thanks to [matterircd](https://github.com/42wim/matterircd)).
-- **YouTube** -  Subscribe to [Mattermost](https://www.youtube.com/@MattermostHQ).
-
-## Contributing
-
-[![Small Image](https://img.shields.io/badge/Contribute%20with-Gitpod-908a85?logo=gitpod)](https://gitpod.io/#https://github.com/mattermost/mattermost)
-
-Please see [CONTRIBUTING.md](./CONTRIBUTING.md).
-[Join the Mattermost Contributors server](https://community.mattermost.com/signup_user_complete/?id=codoy5s743rq5mk18i7u5ksz7e) to join community discussions about contributions, development, and more.
+- [Mattermost documentation](https://docs.mattermost.com/)
+- [Developer documentation](https://developers.mattermost.com/)
+- [Contributing](CONTRIBUTING.md)
