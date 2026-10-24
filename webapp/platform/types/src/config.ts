@@ -242,6 +242,10 @@ export type ClientConfig = {
     BurnOnReadDurationSeconds: string;
     BurnOnReadMaximumTimeToLiveSeconds: string;
 
+    // Read Receipts Settings
+    EnableReadReceipts: string;
+    ReadReceiptsMaxChannelMembers: string;
+
     // Access Control Settings
     EnableAttributeBasedAccessControl: string;
     EnableUserManagedAttributes: string;

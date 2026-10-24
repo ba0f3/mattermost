@@ -100,6 +100,11 @@ export type BurnOnReadPostAllRevealed = BaseWebSocketMessage<WebSocketEvents.Bur
     sender_expire_at: number;
 }>;
 
+export type PostSeen = BaseWebSocketMessage<WebSocketEvents.PostSeen, {
+    post_id: string;
+    user_id: string;
+}>;
+
 export type EphemeralPost = BaseWebSocketMessage<WebSocketEvents.EphemeralMessage, {
     post: JsonEncodedValue<Post>;
 }>;

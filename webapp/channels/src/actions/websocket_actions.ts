@@ -84,6 +84,7 @@ import {
     fetchPropertyValues,
     fetchSystemPropertyValues,
 } from 'mattermost-redux/actions/properties';
+import {receivedPostSeen} from 'mattermost-redux/actions/read_receipts';
 import {getRecap} from 'mattermost-redux/actions/recaps';
 import {invalidateRenderDecisionsForChannel, clearRenderDecisions} from 'mattermost-redux/actions/render_permissions';
 import {loadRolesIfNeeded} from 'mattermost-redux/actions/roles';
@@ -478,6 +479,10 @@ export function handleEvent(msg: WebSocketMessage) {
 
     case WebSocketEvents.BurnOnReadPostAllRevealed:
         dispatch(handleBurnOnReadAllRevealed(msg.data));
+        break;
+
+    case WebSocketEvents.PostSeen:
+        dispatch(receivedPostSeen(msg.data.post_id, msg.data.user_id));
         break;
 
     case WebSocketEvents.LeaveTeam:

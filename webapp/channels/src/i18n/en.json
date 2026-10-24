@@ -27715,6 +27715,30 @@
     "defaultMessage": "Quarantine for Review",
     "description": "Menu item in the message actions menu (content moderation feature) that flags the message for review by moderators; 'Quarantine' is a verb."
   },
+  "post_info.read_receipts.empty": {
+    "defaultMessage": "No one has seen this message yet.",
+    "description": "Empty state in the Seen by modal when no one has seen the message."
+  },
+  "post_info.read_receipts.reactions": {
+    "defaultMessage": "Reactions",
+    "description": "Heading for the list of people who reacted to the message in the Seen by modal."
+  },
+  "post_info.read_receipts.seen": {
+    "defaultMessage": "Seen",
+    "description": "Accessible label and tooltip for the double check mark shown next to your message after someone has seen it."
+  },
+  "post_info.read_receipts.seen_by": {
+    "defaultMessage": "Seen by",
+    "description": "Message actions menu item and modal title listing who has seen your message."
+  },
+  "post_info.read_receipts.sent": {
+    "defaultMessage": "Sent",
+    "description": "Accessible label and tooltip for the single check mark shown next to your message before anyone has seen it."
+  },
+  "post_info.read_receipts.unavailable": {
+    "defaultMessage": "Read receipts aren’t available for this message.",
+    "description": "Shown in the Seen by modal when the server cannot provide read receipts for the message."
+  },
   "post_info.reply": {
     "defaultMessage": "Reply",
     "description": "Menu item in the message actions menu that opens the thread to reply; 'Reply' is a verb."

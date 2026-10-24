@@ -7,8 +7,8 @@ import type {ChannelType} from '@mattermost/types/channels';
 import type {Post, PostType} from '@mattermost/types/posts';
 import type {DeepPartial} from '@mattermost/types/utilities';
 
-import {renderWithContext, screen, userEvent} from 'tests/react_testing_utils';
-import {Locations} from 'utils/constants';
+import {renderWithContext, screen, userEvent, waitFor} from 'tests/react_testing_utils';
+import {Locations, ModalIdentifiers} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
 
 import type {GlobalState} from 'types/store';
@@ -634,5 +634,70 @@ describe('components/dot_menu/DotMenu', () => {
 
         // Since reply option doesn't exist, keyboard shortcut should be blocked (no way to verify action wasn't called, but menu item being hidden confirms it)
         expect(replyOption).toBeNull();
+    });
+    describe('Seen by', () => {
+        test('shows the item and opens the modal when read receipts are available', async () => {
+            const openModal = jest.fn();
+            const props = {
+                ...baseProps,
+                canSeeReadReceipts: true,
+                actions: {...baseProps.actions, openModal},
+            };
+            renderWithContext(<DotMenu {...props}/>, initialState);
+
+            await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${baseProps.post.id}`));
+            await userEvent.click(screen.getByTestId(`seen_by_${baseProps.post.id}`));
+
+            // Menu items run their click handler after the menu finishes closing.
+            await waitFor(() => expect(openModal).toHaveBeenCalledWith(expect.objectContaining({
+                modalId: ModalIdentifiers.POST_SEEN_BY,
+                dialogProps: {postId: baseProps.post.id},
+            })));
+        });
+
+        test('hides the item when read receipts are not available', async () => {
+            renderWithContext(<DotMenu {...baseProps}/>, initialState);
+
+            await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${baseProps.post.id}`));
+
+            expect(screen.queryByTestId(`seen_by_${baseProps.post.id}`)).not.toBeInTheDocument();
+        });
+
+        function stateWithReadReceipts(enabled: string): DeepPartial<GlobalState> {
+            return {
+                ...initialState,
+                entities: {
+                    ...initialState.entities,
+                    general: {config: {...initialState.entities!.general!.config, EnableReadReceipts: enabled}},
+                },
+            };
+        }
+
+        test('is shown on my DM post when the feature is on', async () => {
+            renderWithContext(<DotMenuRoot {...{...baseProps, post: dmPost}}/>, stateWithReadReceipts('true'));
+
+            await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${dmPost.id}`));
+
+            expect(screen.getByTestId(`seen_by_${dmPost.id}`)).toHaveTextContent('Seen by');
+        });
+
+        test('is hidden when the feature is off', async () => {
+            renderWithContext(<DotMenuRoot {...{...baseProps, post: dmPost}}/>, stateWithReadReceipts('false'));
+
+            await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${dmPost.id}`));
+
+            expect(screen.queryByTestId(`seen_by_${dmPost.id}`)).not.toBeInTheDocument();
+        });
+
+        test('is hidden on someone else\'s post', async () => {
+            const otherPost = {...dmPost, id: 'other_dm_post', user_id: 'other_user1'};
+            const state = stateWithReadReceipts('true');
+            state.entities!.posts = {...state.entities!.posts, posts: {...state.entities!.posts!.posts, [otherPost.id]: otherPost}};
+            renderWithContext(<DotMenuRoot {...{...baseProps, post: otherPost}}/>, state);
+
+            await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${otherPost.id}`));
+
+            expect(screen.queryByTestId(`seen_by_${otherPost.id}`)).not.toBeInTheDocument();
+        });
     });
 });

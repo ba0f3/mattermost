@@ -254,6 +254,13 @@ const state: GlobalState = {
             invalidatedAt: 0,
             invalidatedAtByResource: {},
         },
+        readReceipts: {
+            seenStatus: {},
+            seenBy: {},
+            unavailablePosts: {},
+            outOfScopeChannels: {},
+            disabled: false,
+        },
         health: {
             findings: {},
             evaluatedAt: 0,

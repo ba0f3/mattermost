@@ -11,7 +11,7 @@ import type {ChannelType} from '@mattermost/types/channels';
 import type {Post} from '@mattermost/types/posts';
 import type {DeepPartial} from '@mattermost/types/utilities';
 
-import {ChannelTypes, CloudTypes, JobTypes, PostTypes, RenderPermissionTypes, TeamTypes} from 'mattermost-redux/action_types';
+import {ChannelTypes, CloudTypes, JobTypes, PostTypes, ReadReceiptTypes, RenderPermissionTypes, TeamTypes} from 'mattermost-redux/action_types';
 import {fetchMyCategories} from 'mattermost-redux/actions/channel_categories';
 import {fetchAllMyTeamsChannels, getChannelMember} from 'mattermost-redux/actions/channels';
 import {getCustomProfileAttributeFields} from 'mattermost-redux/actions/general';
@@ -291,6 +291,20 @@ describe('handleEvent', () => {
         handleEvent(msg);
 
         expect(store.dispatch).toHaveBeenCalled();
+    });
+
+    test('should mark a post seen on post_seen', () => {
+        const msg = wsMessage<WebSocketMessages.PostSeen>({
+            event: WebSocketEvents.PostSeen,
+            data: {post_id: 'post1', user_id: 'user1'},
+        });
+
+        handleEvent(msg);
+
+        expect(store.dispatch).toHaveBeenCalledWith({
+            type: ReadReceiptTypes.RECEIVED_POST_SEEN,
+            data: {postId: 'post1', userId: 'user1'},
+        });
     });
 });
 

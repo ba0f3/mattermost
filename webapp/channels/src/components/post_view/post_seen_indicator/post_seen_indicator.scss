@@ -1,0 +1,23 @@
+.PostSeenIndicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    color: rgba(var(--center-channel-color-rgb), 0.48);
+
+    &--seen {
+        color: var(--button-bg);
+    }
+}
+
+// In a consecutive post the indicator sits at the right edge of the avatar gutter, so the
+// narrow timestamp that appears there on hover can sit beside it instead of covering it.
+.post__img:has(> .PostSeenIndicator) {
+    position: relative;
+}
+
+.post__img > .PostSeenIndicator {
+    position: absolute;
+    top: 6px;
+    right: 2px;
+    margin: 0;
+}

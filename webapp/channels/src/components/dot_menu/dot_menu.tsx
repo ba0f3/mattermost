@@ -14,6 +14,7 @@ import {
     ContentCopyIcon,
     DotsHorizontalIcon,
     EmoticonPlusOutlineIcon,
+    EyeOutlineIcon,
     LinkVariantIcon,
     MarkAsUnreadIcon,
     MessageArrowRightOutlineIcon,
@@ -40,6 +41,7 @@ import ForwardPostModal from 'components/forward_post_modal';
 import * as Menu from 'components/menu';
 import MoveThreadModal from 'components/move_thread_modal';
 import ChannelPermissionGate from 'components/permissions_gates/channel_permission_gate';
+import PostSeenByModal from 'components/post_seen_by_modal';
 
 import {createBurnOnReadDeleteModalHandlers} from 'hooks/useBurnOnReadDeleteModal';
 import {Locations, ModalIdentifiers, Constants} from 'utils/constants';
@@ -105,6 +107,7 @@ type Props = {
     canCopyText: boolean;
     canCopyLink: boolean;
     canFlagContent?: boolean;
+    canSeeReadReceipts?: boolean;
 
     actions: {
 
@@ -489,6 +492,14 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         this.props.handleDropdownOpened?.(open);
     };
 
+    handleShowSeenBy = () => {
+        this.props.actions.openModal({
+            modalId: ModalIdentifiers.POST_SEEN_BY,
+            dialogType: PostSeenByModal,
+            dialogProps: {postId: this.props.post.id},
+        });
+    };
+
     handleShowTranslation = async () => {
         // Use dynamic import to avoid circular dependency
         // This breaks the cycle because the import only happens at runtime, not at module load time
@@ -597,6 +608,7 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         const showShowTranslation = !isSystemMessage && showTranslation;
         const showCopyText = !isSystemMessage && !isBurnOnReadPost;
         const showCopyLink = !isSystemMessage && (!isBurnOnReadPost || this.props.post.user_id === this.props.userId);
+        const showSeenBy = Boolean(this.props.canSeeReadReceipts);
         const showEdit = this.state.canEdit && !isBurnOnReadPost;
         const showFlagContent = this.props.canFlagContent;
 
@@ -606,7 +618,7 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         const showDelete = (!isBurnOnReadPost && this.state.canDelete) || shouldShowDeleteForBoR;
 
         const firstSectionHasItems = showReply || showForward || showReactions || showFollowPost || showMarkAsUnread || showSave || showRemind || showPin || showMove;
-        const secondSectionHasItems = showShowTranslation || showCopyText || showCopyLink;
+        const secondSectionHasItems = showShowTranslation || showCopyText || showCopyLink || showSeenBy;
         const thirdSectionHasItems = showEdit || showDelete || showFlagContent;
 
         return (
@@ -791,6 +803,19 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
                         leadingElement={<LinkVariantIcon size={18}/>}
                         trailingElements={<ShortcutKey shortcutKey='K'/>}
                         onClick={this.copyLink}
+                    />
+                }
+                {showSeenBy &&
+                    <Menu.Item
+                        id={`seen_by_${this.props.post.id}`}
+                        data-testid={`seen_by_${this.props.post.id}`}
+                        labels={
+                            <FormattedMessage
+                                id='post_info.read_receipts.seen_by'
+                                defaultMessage='Seen by'
+                            />}
+                        leadingElement={<EyeOutlineIcon size={18}/>}
+                        onClick={this.handleShowSeenBy}
                     />
                 }
                 {thirdSectionHasItems && (firstSectionHasItems || secondSectionHasItems) && <Menu.Separator/>}
