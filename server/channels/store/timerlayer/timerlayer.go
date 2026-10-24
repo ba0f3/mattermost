@@ -2558,6 +2558,38 @@ func (s *TimerLayerChannelStore) GetPublicChannelsForTeam(teamID string, offset 
 	return result, err
 }
 
+func (s *TimerLayerChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetReadReceiptMaxLastViewedAt(rctx, channelIDs, excludeUserID)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetReadReceiptMaxLastViewedAt", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetReadReceiptUserIds(rctx, channelID, since, excludeUserID, limit)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetReadReceiptUserIds", success, elapsed)
+	}
+	return result, err
+}
+
 func (s *TimerLayerChannelStore) GetSidebarCategories(userID string, teamID string) (*model.OrderedSidebarCategories, error) {
 	start := time.Now()
 

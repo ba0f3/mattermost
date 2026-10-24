@@ -2987,6 +2987,48 @@ func (s *RetryLayerChannelStore) GetPublicChannelsForTeam(teamID string, offset 
 
 }
 
+func (s *RetryLayerChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetReadReceiptMaxLastViewedAt(rctx, channelIDs, excludeUserID)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetReadReceiptUserIds(rctx, channelID, since, excludeUserID, limit)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
 func (s *RetryLayerChannelStore) GetSidebarCategories(userID string, teamID string) (*model.OrderedSidebarCategories, error) {
 
 	tries := 0

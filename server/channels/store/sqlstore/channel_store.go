@@ -2549,6 +2549,66 @@ func (s SqlChannelStore) GetMembersWithLastViewedAtSince(rctx request.CTX, chann
 	return members, nil
 }
 
+// readReceiptEligibleMembersQuery selects from ChannelMembers joined so that
+// only active, non-bot members that did not opt out of read receipts remain.
+func (s SqlChannelStore) readReceiptEligibleMembersQuery(columns ...string) sq.SelectBuilder {
+	return s.getQueryBuilder().
+		Select(columns...).
+		From("ChannelMembers").
+		InnerJoin("Users ON Users.Id = ChannelMembers.UserId").
+		LeftJoin("Bots ON Bots.UserId = ChannelMembers.UserId").
+		LeftJoin("Preferences ON Preferences.UserId = ChannelMembers.UserId AND Preferences.Category = ? AND Preferences.Name = ? AND Preferences.Value = ?",
+			model.PreferenceCategoryReadReceipts, model.PreferenceNameReadReceiptsOptOut, "true").
+		Where(sq.Eq{"Users.DeleteAt": 0}).
+		Where(sq.Eq{"Bots.UserId": nil}).
+		Where(sq.Eq{"Preferences.UserId": nil})
+}
+
+func (s SqlChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+	result := map[string]int64{}
+	if len(channelIDs) == 0 {
+		return result, nil
+	}
+
+	query := s.readReceiptEligibleMembersQuery("ChannelMembers.ChannelId", "MAX(ChannelMembers.LastViewedAt) AS LastViewedAt").
+		Where(sq.Eq{"ChannelMembers.ChannelId": channelIDs}).
+		Where(sq.NotEq{"ChannelMembers.UserId": excludeUserID}).
+		GroupBy("ChannelMembers.ChannelId")
+
+	rows := []struct {
+		ChannelId    string
+		LastViewedAt int64
+	}{}
+	if err := s.DBXFromContext(rctx.Context()).SelectBuilder(&rows, query); err != nil {
+		return nil, errors.Wrap(err, "failed to get read receipt max last viewed at")
+	}
+	for _, row := range rows {
+		result[row.ChannelId] = row.LastViewedAt
+	}
+
+	return result, nil
+}
+
+func (s SqlChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+	if limit <= 0 {
+		return []string{}, nil
+	}
+
+	query := s.readReceiptEligibleMembersQuery("ChannelMembers.UserId").
+		Where(sq.Eq{"ChannelMembers.ChannelId": channelID}).
+		Where(sq.GtOrEq{"ChannelMembers.LastViewedAt": since}).
+		Where(sq.NotEq{"ChannelMembers.UserId": excludeUserID}).
+		OrderBy("ChannelMembers.UserId ASC").
+		Limit(uint64(limit))
+
+	userIDs := []string{}
+	if err := s.DBXFromContext(rctx.Context()).SelectBuilder(&userIDs, query); err != nil {
+		return nil, errors.Wrapf(err, "failed to get read receipt user ids for channelId=%s", channelID)
+	}
+
+	return userIDs, nil
+}
+
 func (s SqlChannelStore) InvalidateAllChannelMembersForUser(userId string) {
 }
 

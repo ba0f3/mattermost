@@ -895,6 +895,22 @@ func TestGenerateClientConfigLockProfileFieldsForEmailUsers(t *testing.T) {
 	}
 }
 
+func TestGenerateClientConfigReadReceipts(t *testing.T) {
+	config := &model.Config{}
+	config.SetDefaults()
+
+	// Read receipts do not depend on any license.
+	clientConfig := GenerateClientConfig(config, "", nil)
+	assert.Equal(t, "false", clientConfig["EnableReadReceipts"])
+	assert.Equal(t, "50", clientConfig["ReadReceiptsMaxChannelMembers"])
+
+	config.ServiceSettings.EnableReadReceipts = new(true)
+	config.ServiceSettings.ReadReceiptsMaxChannelMembers = new(20)
+	clientConfig = GenerateClientConfig(config, "", nil)
+	assert.Equal(t, "true", clientConfig["EnableReadReceipts"])
+	assert.Equal(t, "20", clientConfig["ReadReceiptsMaxChannelMembers"])
+}
+
 func TestGetLimitedClientConfig(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

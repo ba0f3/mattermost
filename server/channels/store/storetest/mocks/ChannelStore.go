@@ -2160,6 +2160,66 @@ func (_m *ChannelStore) GetPublicChannelsForTeam(teamID string, offset int, limi
 	return r0, r1
 }
 
+// GetReadReceiptMaxLastViewedAt provides a mock function with given fields: rctx, channelIDs, excludeUserID
+func (_m *ChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+	ret := _m.Called(rctx, channelIDs, excludeUserID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReadReceiptMaxLastViewedAt")
+	}
+
+	var r0 map[string]int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string) (map[string]int64, error)); ok {
+		return rf(rctx, channelIDs, excludeUserID)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string) map[string]int64); ok {
+		r0 = rf(rctx, channelIDs, excludeUserID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, []string, string) error); ok {
+		r1 = rf(rctx, channelIDs, excludeUserID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetReadReceiptUserIds provides a mock function with given fields: rctx, channelID, since, excludeUserID, limit
+func (_m *ChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+	ret := _m.Called(rctx, channelID, since, excludeUserID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReadReceiptUserIds")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, string, int64, string, int) ([]string, error)); ok {
+		return rf(rctx, channelID, since, excludeUserID, limit)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, string, int64, string, int) []string); ok {
+		r0 = rf(rctx, channelID, since, excludeUserID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, string, int64, string, int) error); ok {
+		r1 = rf(rctx, channelID, since, excludeUserID, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetSidebarCategories provides a mock function with given fields: userID, teamID
 func (_m *ChannelStore) GetSidebarCategories(userID string, teamID string) (*model.OrderedSidebarCategories, error) {
 	ret := _m.Called(userID, teamID)
