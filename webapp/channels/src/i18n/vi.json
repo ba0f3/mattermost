@@ -8396,6 +8396,8 @@
   "user.settings.sidebar.off": "Tắt",
   "user.settings.sidebar.on": "Bật",
   "user.settings.sidebar.recent": "Hoạt động gần đây",
+  "user.settings.sidebar.showUnreadCountDesc": "Khi bật, channel có tin chưa đọc nhưng không có mention sẽ hiện số tin chưa đọc cạnh tên channel.",
+  "user.settings.sidebar.showUnreadCountTitle": "Hiện số tin chưa đọc",
   "user.settings.sidebar.showUnreadsCategoryDesc": "Khi được bật, tất cả các kênh chưa đọc và tin nhắn trực tiếp sẽ được nhóm lại với nhau trong thanh bên.",
   "user.settings.sidebar.showUnreadsCategoryTitle": "Nhóm các kênh chưa đọc riêng biệt",
   "user.settings.sidebar.sortAlpha": "Theo thứ tự bảng chữ cái",

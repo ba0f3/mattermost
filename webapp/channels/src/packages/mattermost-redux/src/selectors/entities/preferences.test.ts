@@ -821,6 +821,27 @@ describe('shouldShowJoinLeaveMessages', () => {
     });
 });
 
+describe('shouldShowUnreadCount', () => {
+    const makeState = (myPreferences: Record<string, {value: string}>) => ({
+        entities: {
+            general: {config: {}},
+            preferences: {myPreferences},
+        },
+    } as unknown as GlobalState);
+
+    test('should default to true when the preference is not set', () => {
+        expect(Selectors.shouldShowUnreadCount(makeState({}))).toBe(true);
+    });
+
+    test('should return false when the user turned it off', () => {
+        const state = makeState({
+            [getPreferenceKey(Preferences.CATEGORY_SIDEBAR_SETTINGS, Preferences.SHOW_UNREAD_COUNT)]: {value: 'false'},
+        });
+
+        expect(Selectors.shouldShowUnreadCount(state)).toBe(false);
+    });
+});
+
 describe('shouldShowUnreadsCategory', () => {
     test('should return value from the preference if set', () => {
         const state = {

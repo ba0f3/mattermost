@@ -7,6 +7,7 @@ import {FormattedMessage} from 'react-intl';
 import type {PreferencesType} from '@mattermost/types/preferences';
 
 import LimitVisibleGMsDMs from './limit_visible_gms_dms';
+import ShowUnreadCount from './show_unread_count';
 import ShowUnreadsCategory from './show_unreads_category';
 
 import SettingDesktopHeader from '../headers/setting_desktop_header';
@@ -55,6 +56,15 @@ export default function UserSettingsSidebar(props: Props): JSX.Element {
                 <div className='divider-dark first'/>
                 <ShowUnreadsCategory
                     active={props.activeSection === 'showUnreadsCategory'}
+                    updateSection={props.updateSection}
+                    areAllSectionsInactive={props.activeSection === ''}
+                    adminMode={props.adminMode}
+                    userId={props.userId}
+                    userPreferences={props.userPreferences}
+                />
+                <div className='divider-dark'/>
+                <ShowUnreadCount
+                    active={props.activeSection === 'showUnreadCount'}
                     updateSection={props.updateSection}
                     areAllSectionsInactive={props.activeSection === ''}
                     adminMode={props.adminMode}

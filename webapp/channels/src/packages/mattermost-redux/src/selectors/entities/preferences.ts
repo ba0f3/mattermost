@@ -215,6 +215,11 @@ export function shouldShowJoinLeaveMessages(state: GlobalState) {
     return getBool(state, Preferences.CATEGORY_ADVANCED_SETTINGS, Preferences.ADVANCED_FILTER_JOIN_LEAVE, enableJoinLeaveMessage);
 }
 
+// shouldShowUnreadCount returns true unless the user turned off unread message counts in the sidebar.
+export function shouldShowUnreadCount(state: GlobalState, userPreferences?: PreferencesType): boolean {
+    return get(state, Preferences.CATEGORY_SIDEBAR_SETTINGS, Preferences.SHOW_UNREAD_COUNT, 'true', userPreferences) !== 'false';
+}
+
 // shouldShowUnreadsCategory returns true if the user has unereads grouped separately with the new sidebar enabled.
 export const shouldShowUnreadsCategory: (state: GlobalState, userPreferences?: PreferencesType) => boolean = createSelector(
     'shouldShowUnreadsCategory',

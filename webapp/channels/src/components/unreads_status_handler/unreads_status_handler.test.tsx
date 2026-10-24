@@ -10,11 +10,35 @@ import type {TeamType} from '@mattermost/types/teams';
 
 import UnreadsStatusHandler, {UnreadsStatusHandlerClass} from 'components/unreads_status_handler/unreads_status_handler';
 
-import {renderWithContext} from 'tests/react_testing_utils';
+import {renderWithContext, waitFor} from 'tests/react_testing_utils';
 import {Constants} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
 
 type Props = ComponentProps<typeof UnreadsStatusHandlerClass>;
+
+// jsdom doesn't load images, so make them load (or fail to load if the URL contains "broken") as soon as src is set
+function mockImageLoading() {
+    const OriginalImage = window.Image;
+    return jest.spyOn(window, 'Image').mockImplementation(() => {
+        const image = new OriginalImage();
+        Object.defineProperty(image, 'src', {
+            set(value: string) {
+                image.setAttribute('src', value);
+                Promise.resolve().then(() => {
+                    if (value.includes('broken')) {
+                        image.onerror?.(new Event('error'));
+                    } else {
+                        image.onload?.(new Event('load'));
+                    }
+                });
+            },
+            get() {
+                return image.getAttribute('src');
+            },
+        });
+        return image;
+    });
+}
 
 jest.mock('@mattermost/shared/utils/user_agent', () => {
     const original = jest.requireActual('@mattermost/shared/utils/user_agent');
@@ -231,5 +255,227 @@ describe('components/UnreadsStatusHandler', () => {
         );
 
         expect(document.title).toBe('Scheduled - Test team display name');
+    });
+
+    describe('badges', () => {
+        const sizes = ['16x16', '32x32'];
+
+        function addFavicons(name: string) {
+            return sizes.map((size) => {
+                const link = document.createElement('link');
+                link.rel = 'icon';
+                link.href = `http://localhost:8065/static/${name}-${size}.png`;
+                link.setAttribute('sizes', size);
+                document.head.appendChild(link);
+                return link;
+            });
+        }
+
+        beforeEach(() => {
+            mockImageLoading();
+        });
+
+        afterEach(() => {
+            jest.restoreAllMocks();
+            document.head.querySelectorAll('link[rel="icon"]').forEach((link) => link.remove());
+            Reflect.deleteProperty(navigator, 'setAppBadge');
+            Reflect.deleteProperty(navigator, 'clearAppBadge');
+        });
+
+        test('should draw a count badge over the current favicon and restore it when everything is read', async () => {
+            const links = addFavicons('custom-favicon');
+            const fillText = jest.spyOn(CanvasRenderingContext2D.prototype, 'fillText');
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={150}
+                />,
+            );
+
+            await waitFor(() => {
+                for (const link of links) {
+                    expect(link.href).toMatch(/^data:image\/png/);
+                }
+            });
+            expect(fillText).toHaveBeenCalledWith('99+', expect.any(Number), expect.any(Number), expect.any(Number));
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={false}
+                />,
+            );
+
+            expect(links[0].href).toBe('http://localhost:8065/static/custom-favicon-16x16.png');
+            expect(links[1].href).toBe('http://localhost:8065/static/custom-favicon-32x32.png');
+        });
+
+        test('should draw a dot when there are unread messages without mentions', async () => {
+            const links = addFavicons('dot-favicon');
+            const fillText = jest.spyOn(CanvasRenderingContext2D.prototype, 'fillText');
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={true}
+                />,
+            );
+
+            await waitFor(() => expect(links[0].href).toMatch(/^data:image\/png/));
+            expect(fillText).not.toHaveBeenCalled();
+        });
+
+        test('should draw the badge when mounted with unreads', async () => {
+            const links = addFavicons('mount-favicon');
+
+            renderWithContext(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={2}
+                />,
+            );
+
+            await waitFor(() => expect(links[0].href).toMatch(/^data:image\/png/));
+        });
+
+        test('should fall back to the bundled icons when the badge cannot be drawn', async () => {
+            const links = addFavicons('broken-favicon');
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={3}
+                />,
+            );
+
+            // The bundled mention icons are mocked as "test-file-stub" in tests
+            await waitFor(() => {
+                for (const link of links) {
+                    expect(link.getAttribute('href')).toBe('test-file-stub');
+                }
+            });
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={false}
+                />,
+            );
+            expect(links[0].href).toBe('http://localhost:8065/static/broken-favicon-16x16.png');
+        });
+
+        test('should not redraw the badges when what they show has not changed', async () => {
+            const links = addFavicons('unchanged-favicon');
+            const setAppBadge = jest.fn().mockResolvedValue(undefined);
+            const clearAppBadge = jest.fn().mockResolvedValue(undefined);
+            Object.assign(navigator, {setAppBadge, clearAppBadge});
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={150}
+                />,
+            );
+            await waitFor(() => expect(links[0].href).toMatch(/^data:image\/png/));
+
+            const toDataURL = jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL');
+            toDataURL.mockClear();
+
+            // Both counts are shown as 99+, and changing channel doesn't change the unread status
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={200}
+                />,
+            );
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={200}
+                    inDrafts={true}
+                />,
+            );
+            await Promise.resolve();
+
+            expect(toDataURL).not.toHaveBeenCalled();
+            expect(setAppBadge).toHaveBeenCalledTimes(1);
+            expect(setAppBadge).toHaveBeenCalledWith(150);
+        });
+
+        test('should set and clear the app badge when it is supported', () => {
+            const setAppBadge = jest.fn().mockResolvedValue(undefined);
+            const clearAppBadge = jest.fn().mockRejectedValue(new Error('Not installed'));
+            Object.assign(navigator, {setAppBadge, clearAppBadge});
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+            expect(clearAppBadge).toHaveBeenCalledTimes(1);
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={7}
+                />,
+            );
+            expect(setAppBadge).toHaveBeenLastCalledWith(7);
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={true}
+                />,
+            );
+            expect(setAppBadge).toHaveBeenLastCalledWith();
+
+            rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={false}
+                />,
+            );
+            expect(clearAppBadge).toHaveBeenCalledTimes(2);
+        });
+
+        test('should clear badges left over from a previous mount', async () => {
+            const links = addFavicons('remount-favicon');
+            const setAppBadge = jest.fn().mockResolvedValue(undefined);
+            const clearAppBadge = jest.fn().mockResolvedValue(undefined);
+            Object.assign(navigator, {setAppBadge, clearAppBadge});
+
+            const {unmount} = renderWithContext(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={4}
+                />,
+            );
+            await waitFor(() => expect(links[0].href).toMatch(/^data:image\/png/));
+            expect(setAppBadge).toHaveBeenLastCalledWith(4);
+            unmount();
+
+            expect(clearAppBadge).not.toHaveBeenCalled();
+
+            renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+
+            expect(links[0].href).toBe('http://localhost:8065/static/remount-favicon-16x16.png');
+            expect(clearAppBadge).toHaveBeenCalledTimes(1);
+        });
+
+        test('should not set the app badge when it is not supported', () => {
+            expect('setAppBadge' in navigator).toBe(false);
+
+            const {rerender} = renderWithContext(<UnreadsStatusHandler {...defaultProps}/>);
+
+            expect(() => rerender(
+                <UnreadsStatusHandler
+                    {...defaultProps}
+                    unreadStatus={7}
+                />,
+            )).not.toThrow();
+        });
     });
 });

@@ -48,6 +48,7 @@ const Preferences = {
     CHANNEL_SIDEBAR_ORGANIZATION: 'channel_sidebar_organization',
     LIMIT_VISIBLE_DMS_GMS: 'limit_visible_dms_gms',
     SHOW_UNREAD_SECTION: 'show_unread_section',
+    SHOW_UNREAD_COUNT: 'show_unread_count',
     CATEGORY_ADVANCED_SETTINGS: 'advanced_settings',
     ADVANCED_FILTER_JOIN_LEAVE: 'join_leave',
     RENDER_EMOTICONS_AS_EMOJI: 'render_emoticons_as_emoji',

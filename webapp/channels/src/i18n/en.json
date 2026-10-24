@@ -33931,6 +33931,14 @@
     "defaultMessage": "Recent activity",
     "description": "Sort-order option in sidebar category menus: order channels by most recent activity."
   },
+  "user.settings.sidebar.showUnreadCountDesc": {
+    "defaultMessage": "When enabled, channels with unread messages but no mentions show the number of unread messages next to the channel name.",
+    "description": "Description of the sidebar setting that shows an unread message count next to channels without mentions."
+  },
+  "user.settings.sidebar.showUnreadCountTitle": {
+    "defaultMessage": "Show unread message count",
+    "description": "Title of the sidebar setting that shows an unread message count next to channels without mentions."
+  },
   "user.settings.sidebar.showUnreadsCategoryDesc": {
     "defaultMessage": "When enabled, all unread channels and direct messages will be grouped together in the sidebar.",
     "description": "Help text for the sidebar setting that groups unread channels into their own sidebar category."
