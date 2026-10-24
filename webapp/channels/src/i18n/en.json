@@ -26003,6 +26003,18 @@
     "defaultMessage": "Click to call {phoneNumber}",
     "description": "Tooltip shown when hovering a phone number link in a message."
   },
+  "markdown_preview.preview": {
+    "defaultMessage": "Preview",
+    "description": "Toggle button in the file preview modal for a Markdown attachment; shows the file rendered as formatted Markdown."
+  },
+  "markdown_preview.source": {
+    "defaultMessage": "Source",
+    "description": "Toggle button in the file preview modal for a Markdown attachment; shows the raw Markdown source text."
+  },
+  "markdown_preview.view_mode": {
+    "defaultMessage": "Markdown view mode",
+    "description": "Accessible label for the Preview/Source toggle group shown when previewing a Markdown file attachment."
+  },
   "marketplace_command.disabled": {
     "defaultMessage": "The marketplace is disabled. Please contact your System Administrator for details.",
     "description": "Error returned when a user runs the /marketplace slash command but the marketplace feature is turned off."
