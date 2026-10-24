@@ -6,6 +6,8 @@ import type {AnyAction} from 'redux';
 
 import type {DeepPartial} from '@mattermost/types/utilities';
 
+import {getPrevTrialLicense} from 'mattermost-redux/actions/admin';
+
 import {renderWithContext, screen, userEvent, waitFor} from 'tests/react_testing_utils';
 import {ActionTypes, ModalIdentifiers} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
@@ -14,7 +16,15 @@ import type {GlobalState} from 'types/store';
 
 import {SwitchProductMenu} from './switch_product_menu';
 
+jest.mock('mattermost-redux/actions/admin', () => ({
+    ...jest.requireActual('mattermost-redux/actions/admin'),
+    getPrevTrialLicense: jest.fn(() => ({type: 'TEST_GET_PREV_TRIAL_LICENSE'})),
+}));
+
 describe('SwitchProductMenu', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
     const initialState: DeepPartial<GlobalState> = {
         entities: {
             general: {
@@ -38,6 +48,25 @@ describe('SwitchProductMenu', () => {
             },
         },
     };
+
+    test('does not request an enterprise trial license on Team Edition', () => {
+        renderWithContext(<SwitchProductMenu productId={null}/>, initialState);
+        expect(getPrevTrialLicense).not.toHaveBeenCalled();
+    });
+
+    test('requests previous trial information on an Enterprise-ready build', () => {
+        renderWithContext(<SwitchProductMenu productId={null}/>, {
+            ...initialState,
+            entities: {
+                ...initialState.entities,
+                general: {
+                    ...initialState.entities?.general,
+                    config: {BuildEnterpriseReady: 'true'},
+                },
+            },
+        });
+        expect(getPrevTrialLicense).toHaveBeenCalledTimes(1);
+    });
 
     test('should label the menu button as opening the product menu', () => {
         renderWithContext(<SwitchProductMenu productId={null}/>, initialState);

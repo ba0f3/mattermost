@@ -69,8 +69,10 @@ export function SwitchProductMenu(props: Props) {
     const isChannelsProductActive = isChannels(props.productId);
 
     useEffect(() => {
-        dispatch(getPrevTrialLicense());
-    }, [dispatch]);
+        if (isEnterpriseReady) {
+            dispatch(getPrevTrialLicense());
+        }
+    }, [dispatch, isEnterpriseReady]);
 
     return (
         <Menu.Container
