@@ -6,8 +6,6 @@ import React from 'react';
 import type {DeepPartial} from '@mattermost/types/utilities';
 
 import {getPostsSeenStatusBatched} from 'mattermost-redux/actions/read_receipts';
-import {Preferences} from 'mattermost-redux/constants';
-import {getPreferenceKey} from 'mattermost-redux/utils/preference_utils';
 
 import {renderWithContext, screen} from 'tests/react_testing_utils';
 import {TestHelper} from 'utils/test_helper';
@@ -64,14 +62,6 @@ describe('PostSeenIndicator', () => {
 
     test.each([
         ['the feature is off', {entities: {general: {config: {EnableReadReceipts: 'false'}}}}],
-        ['I opted out', {entities: {preferences: {myPreferences: {
-            [getPreferenceKey(Preferences.CATEGORY_READ_RECEIPTS, Preferences.READ_RECEIPTS_OPT_OUT)]: {
-                user_id: 'me',
-                category: Preferences.CATEGORY_READ_RECEIPTS,
-                name: Preferences.READ_RECEIPTS_OPT_OUT,
-                value: 'true',
-            },
-        }}}}],
         ['the server disabled it', {entities: {readReceipts: {disabled: true}}}],
         ['the post is unavailable', {entities: {readReceipts: {unavailablePosts: {post1: true}}}}],
         ['the channel is out of scope', {entities: {readReceipts: {outOfScopeChannels: {dm: true}}}}],

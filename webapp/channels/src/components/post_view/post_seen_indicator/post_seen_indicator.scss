@@ -9,15 +9,15 @@
     }
 }
 
-// In a consecutive post the gutter also holds the narrow timestamp, which takes over on hover.
-.post__img .PostSeenIndicator {
-    margin: 6px 0 0;
+// In a consecutive post the indicator sits at the right edge of the avatar gutter, so the
+// narrow timestamp that appears there on hover can sit beside it instead of covering it.
+.post__img:has(> .PostSeenIndicator) {
+    position: relative;
 }
 
-.post:hover,
-.post.post--hovered,
-.post.a11y--active {
-    .post__img .PostSeenIndicator {
-        visibility: hidden;
-    }
+.post__img > .PostSeenIndicator {
+    position: absolute;
+    top: 6px;
+    right: 2px;
+    margin: 0;
 }

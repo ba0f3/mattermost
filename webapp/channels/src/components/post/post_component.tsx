@@ -126,6 +126,7 @@ export type Props = {
     isFlaggedPosts?: boolean;
     isPinnedPosts?: boolean;
     clickToReply?: boolean;
+    canMarkAsUnread?: boolean;
     isCommentMention?: boolean;
     parentPost?: Post;
     parentPostUser?: UserProfile | null;
@@ -422,7 +423,7 @@ function PostComponent(props: Props) {
             props.actions.selectPost(post);
         }
 
-        if (e.altKey) {
+        if (e.altKey && props.canMarkAsUnread !== false) {
             props.actions.markPostAsUnread(post, props.location);
         }
     }, [
@@ -432,6 +433,7 @@ function PostComponent(props: Props) {
         isSystemMessage,
         props.channelIsArchived,
         props.clickToReply,
+        props.canMarkAsUnread,
         props.actions,
         props.location,
         props.isPostBeingEdited,

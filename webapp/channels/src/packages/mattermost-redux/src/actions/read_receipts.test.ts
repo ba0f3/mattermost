@@ -77,17 +77,6 @@ describe('Actions.ReadReceipts', () => {
             expect(store.getState().entities.readReceipts.disabled).toBe(true);
         });
 
-        test('disables receipts on 403 with an opted_out id prefix', async () => {
-            nock(Client4.getBaseRoute()).
-                post('/posts/seen_status').
-                reply(403, {id: 'api.post.seen.opted_out.app_error', status_code: 403});
-
-            await store.dispatch(Actions.getPostsSeenStatus(['post1']));
-
-            expect(store.getState().entities.readReceipts.disabled).toBe(true);
-            expect(store.getState().entities.readReceipts.outOfScopeChannels).toEqual({});
-        });
-
         test('hides receipts for the channel on 403 with an out_of_scope id prefix', async () => {
             nock(Client4.getBaseRoute()).
                 post('/posts/seen_status').
@@ -188,14 +177,15 @@ describe('Actions.ReadReceipts', () => {
             expect(store.getState().entities.readReceipts.unavailablePosts).toEqual({post1: true});
         });
 
-        test('matches error ids by prefix', async () => {
+        test('ignores a 403 with an unknown id', async () => {
             nock(Client4.getBaseRoute()).
                 get('/posts/post1/seen').
-                reply(403, {id: 'api.post.seen.opted_out.other.app_error', status_code: 403});
+                reply(403, {id: 'api.post.seen.opted_out.app_error', status_code: 403});
 
             await store.dispatch(Actions.getPostSeenBy('post1'));
 
-            expect(store.getState().entities.readReceipts.disabled).toBe(true);
+            expect(store.getState().entities.readReceipts.disabled).toBe(false);
+            expect(store.getState().entities.readReceipts.unavailablePosts).toEqual({});
         });
     });
 

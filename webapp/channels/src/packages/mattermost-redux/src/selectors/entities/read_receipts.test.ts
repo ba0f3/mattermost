@@ -7,14 +7,13 @@ import type {Post} from '@mattermost/types/posts';
 import type {GlobalState} from '@mattermost/types/store';
 import type {DeepPartial} from '@mattermost/types/utilities';
 
-import {General, Posts, Preferences} from 'mattermost-redux/constants';
+import {General, Posts} from 'mattermost-redux/constants';
 import {
     canShowPostReadReceipts,
     isChannelEligibleForReadReceipts,
     isPostEligibleForReadReceipts,
     isReadReceiptsEnabled,
 } from 'mattermost-redux/selectors/entities/read_receipts';
-import {getPreferenceKey} from 'mattermost-redux/utils/preference_utils';
 
 import TestHelper from '../../../test/test_helper';
 import {makeInitialState} from '../../../test/test_store';
@@ -53,24 +52,6 @@ describe('selectors.entities.readReceipts', () => {
             expect(isReadReceiptsEnabled(makeState())).toBe(true);
             expect(isReadReceiptsEnabled(makeState({entities: {general: {config: {EnableReadReceipts: 'false'}}}}))).toBe(false);
             expect(isReadReceiptsEnabled(makeState({entities: {general: {config: {EnableReadReceipts: ''}}}}))).toBe(false);
-        });
-
-        test('is off when opted out', () => {
-            const state = makeState({
-                entities: {
-                    preferences: {
-                        myPreferences: {
-                            [getPreferenceKey(Preferences.CATEGORY_READ_RECEIPTS, Preferences.READ_RECEIPTS_OPT_OUT)]: {
-                                user_id: me,
-                                category: Preferences.CATEGORY_READ_RECEIPTS,
-                                name: Preferences.READ_RECEIPTS_OPT_OUT,
-                                value: 'true',
-                            },
-                        },
-                    },
-                },
-            });
-            expect(isReadReceiptsEnabled(state)).toBe(false);
         });
 
         test('is off once the server disabled it for the session', () => {

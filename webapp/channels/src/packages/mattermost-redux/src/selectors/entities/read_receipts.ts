@@ -5,17 +5,12 @@ import type {Post} from '@mattermost/types/posts';
 import type {GlobalState} from '@mattermost/types/store';
 import type {UserProfile} from '@mattermost/types/users';
 
-import {General, Preferences} from 'mattermost-redux/constants';
+import {General} from 'mattermost-redux/constants';
 import {getCurrentUserId} from 'mattermost-redux/selectors/entities/common';
 import {getConfig} from 'mattermost-redux/selectors/entities/general';
-import {get as getPreference} from 'mattermost-redux/selectors/entities/preferences';
 import {isFromWebhook, isPostEphemeral, isPostPendingOrFailed, isSystemMessage} from 'mattermost-redux/utils/post_utils';
 
 const DEFAULT_MAX_CHANNEL_MEMBERS = 50;
-
-export function isReadReceiptsOptedOut(state: GlobalState): boolean {
-    return getPreference(state, Preferences.CATEGORY_READ_RECEIPTS, Preferences.READ_RECEIPTS_OPT_OUT, 'false') === 'true';
-}
 
 export function isReadReceiptsFeatureEnabled(state: GlobalState): boolean {
     return getConfig(state).EnableReadReceipts === 'true';
@@ -24,7 +19,6 @@ export function isReadReceiptsFeatureEnabled(state: GlobalState): boolean {
 // Whether receipts can be shown anywhere for the current user this session.
 export function isReadReceiptsEnabled(state: GlobalState): boolean {
     return isReadReceiptsFeatureEnabled(state) &&
-        !isReadReceiptsOptedOut(state) &&
         !state.entities.readReceipts.disabled;
 }
 

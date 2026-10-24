@@ -8026,8 +8026,6 @@
   "user.settings.advance.performance.noneEnabled": "Không có cài đặt nào được bật",
   "user.settings.advance.performance.settingsEnabled": "{count, number} {count, plural, one {cài đặt} other {cài đặt}} đã được bật",
   "user.settings.advance.performance.title": "Gỡ lỗi hiệu suất",
-  "user.settings.advance.readReceiptsDesc": "Khi bật, mọi người có thể biết bạn đã xem tin nhắn của họ trong tin nhắn trực tiếp, tin nhắn nhóm và kênh nhỏ, và bạn cũng có thể biết họ đã xem tin nhắn của bạn. Khi tắt, cả hai đều không hiển thị.",
-  "user.settings.advance.readReceiptsTitle": "Gửi và hiển thị trạng thái đã xem",
   "user.settings.advance.sendDesc": "Khi được bật, CTRL + ENTER sẽ gửi tin nhắn và ENTER chèn một dòng mới.",
   "user.settings.advance.sendDesc.mac": "Khi được bật, ⌘ + ENTER sẽ gửi tin nhắn và ENTER chèn một dòng mới.",
   "user.settings.advance.sendTitle": "Gửi tin nhắn bằng CTRL + ENTER",

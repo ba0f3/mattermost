@@ -3,12 +3,10 @@
 
 import {combineReducers} from 'redux';
 
-import type {PreferenceType} from '@mattermost/types/preferences';
 import type {ReadReceiptsState} from '@mattermost/types/read_receipts';
 
-import {PreferenceTypes, ReadReceiptTypes, UserTypes} from 'mattermost-redux/action_types';
+import {ReadReceiptTypes, UserTypes} from 'mattermost-redux/action_types';
 import type {MMReduxAction} from 'mattermost-redux/action_types';
-import {Preferences} from 'mattermost-redux/constants';
 
 function seenStatus(state: ReadReceiptsState['seenStatus'] = {}, action: MMReduxAction): ReadReceiptsState['seenStatus'] {
     switch (action.type) {
@@ -91,21 +89,10 @@ function outOfScopeChannels(state: ReadReceiptsState['outOfScopeChannels'] = {},
     }
 }
 
-function isOptOutPreference(preference: PreferenceType) {
-    return preference.category === Preferences.CATEGORY_READ_RECEIPTS && preference.name === Preferences.READ_RECEIPTS_OPT_OUT;
-}
-
 function disabled(state = false, action: MMReduxAction): boolean {
     switch (action.type) {
     case ReadReceiptTypes.READ_RECEIPTS_DISABLED:
         return true;
-    case PreferenceTypes.RECEIVED_PREFERENCES:
-    case PreferenceTypes.DELETED_PREFERENCES:
-        // Changing the opt-out setting gives the server another chance to answer.
-        if (state && (action.data as PreferenceType[]).some(isOptOutPreference)) {
-            return false;
-        }
-        return state;
     case UserTypes.LOGOUT_SUCCESS:
         return false;
     default:

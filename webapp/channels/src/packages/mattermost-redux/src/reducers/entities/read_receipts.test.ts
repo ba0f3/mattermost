@@ -1,8 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {PreferenceTypes, ReadReceiptTypes, UserTypes} from 'mattermost-redux/action_types';
-import {Preferences} from 'mattermost-redux/constants';
+import {ReadReceiptTypes, UserTypes} from 'mattermost-redux/action_types';
 import reducer from 'mattermost-redux/reducers/entities/read_receipts';
 
 type ReducerState = ReturnType<typeof reducer>;
@@ -63,23 +62,6 @@ describe('reducers.entities.readReceipts', () => {
 
         expect(state.seenStatus).toEqual({a: true, b: true});
         expect(state.seenBy).toEqual({a: ['u1', 'u2']});
-    });
-
-    test('READ_RECEIPTS_DISABLED is cleared when the opt-out preference changes', () => {
-        let state = reducer(initialState, {type: ReadReceiptTypes.READ_RECEIPTS_DISABLED});
-        expect(state.disabled).toBe(true);
-
-        state = reducer(state, {
-            type: PreferenceTypes.RECEIVED_PREFERENCES,
-            data: [{user_id: 'me', category: 'display_settings', name: 'theme', value: '{}'}],
-        });
-        expect(state.disabled).toBe(true);
-
-        state = reducer(state, {
-            type: PreferenceTypes.RECEIVED_PREFERENCES,
-            data: [{user_id: 'me', category: Preferences.CATEGORY_READ_RECEIPTS, name: Preferences.READ_RECEIPTS_OPT_OUT, value: 'false'}],
-        });
-        expect(state.disabled).toBe(false);
     });
 
     test('unavailable posts and channels are remembered', () => {

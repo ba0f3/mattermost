@@ -16,6 +16,7 @@ import {getChannel as fetchChannel} from 'mattermost-redux/actions/channels';
 import {markLastPostInThreadAsUnread, updateThreadRead} from 'mattermost-redux/actions/threads';
 import {getMissingProfilesByIds} from 'mattermost-redux/actions/users';
 import {Posts} from 'mattermost-redux/constants';
+import {isReadReceiptsFeatureEnabled} from 'mattermost-redux/selectors/entities/read_receipts';
 import {getCurrentUserId} from 'mattermost-redux/selectors/entities/users';
 import {ensureString} from 'mattermost-redux/utils/post_utils';
 
@@ -84,6 +85,9 @@ function ThreadItem({
     const {select, goToInChannel, currentTeamId} = useThreadRouting();
     const {formatMessage, locale} = useIntl();
     const currentUserId = useSelector(getCurrentUserId);
+
+    // Marking unread is blocked by the server while read receipts are on.
+    const canMarkAsUnread = !useSelector(isReadReceiptsFeatureEnabled);
     const msgDeleted = formatMessage({id: 'post_body.deleted', defaultMessage: '(message deleted)'});
     const postAuthor = ensureString(post?.props?.override_username) || displayName;
     const getMentionKeysForPost = useMemo(() => makeGetMentionKeysForPost(), []);
@@ -136,6 +140,9 @@ function ThreadItem({
 
         if (e.altKey) {
             const hasUnreads = thread ? Boolean(thread.unread_replies) : false;
+            if (!hasUnreads && !canMarkAsUnread) {
+                return;
+            }
             const lastViewedAt = hasUnreads ? Date.now() : unreadTimestamp;
 
             dispatch(manuallyMarkThreadAsUnread(threadId, lastViewedAt ?? 0));
@@ -155,6 +162,7 @@ function ThreadItem({
         currentUserId,
         currentTeamId,
         select,
+        canMarkAsUnread,
     ]);
 
     const imageProps = useMemo(() => ({

@@ -32451,14 +32451,6 @@
     "defaultMessage": "Performance Debugging",
     "description": "Section title in Settings > Advanced for temporary performance debugging options."
   },
-  "user.settings.advance.readReceiptsDesc": {
-    "defaultMessage": "When on, people can see when you have seen their messages in direct messages, group messages and small channels, and you can see when they have seen yours. When off, neither is shown.",
-    "description": "Description for the read receipts setting in Settings > Advanced; explains that opting out works both ways."
-  },
-  "user.settings.advance.readReceiptsTitle": {
-    "defaultMessage": "Send and show read receipts",
-    "description": "Section title in Settings > Advanced for turning read receipts on or off."
-  },
   "user.settings.advance.sendDesc": {
     "defaultMessage": "When enabled, CTRL + ENTER will send the message and ENTER inserts a new line.",
     "description": "Help text for the send-on-Ctrl+Enter setting in Settings > Advanced; CTRL and ENTER are keyboard keys."

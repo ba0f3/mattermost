@@ -14,7 +14,6 @@ import {forceLogoutIfNecessary} from './helpers';
 import {getMissingProfilesByIds} from './users';
 
 // Server error ids end in ".app_error", so these are matched as prefixes.
-export const OPTED_OUT_ERROR_ID = 'api.post.seen.opted_out';
 export const OUT_OF_SCOPE_ERROR_ID = 'api.post.seen.out_of_scope';
 
 const MAX_BATCH_SIZE = 200;
@@ -31,9 +30,7 @@ function handleReadReceiptsError(error: ServerError, postIds: Array<Post['id']>,
         dispatch({type: ReadReceiptTypes.READ_RECEIPTS_DISABLED});
         break;
     case 403:
-        if (errorId.startsWith(OPTED_OUT_ERROR_ID)) {
-            dispatch({type: ReadReceiptTypes.READ_RECEIPTS_DISABLED});
-        } else if (errorId.startsWith(OUT_OF_SCOPE_ERROR_ID)) {
+        if (errorId.startsWith(OUT_OF_SCOPE_ERROR_ID)) {
             const posts = getState().entities.posts.posts;
             const channelIds = new Set(postIds.map((postId) => posts[postId]?.channel_id).filter(Boolean));
             for (const channelId of channelIds) {

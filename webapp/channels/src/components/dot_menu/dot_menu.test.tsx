@@ -387,6 +387,18 @@ describe('components/dot_menu/DotMenu', () => {
         expect(menuItem).toBeNull();
     });
 
+    test('should not show mark as unread while read receipts are on', async () => {
+        renderWithContext(
+            <DotMenu
+                {...baseProps}
+                canMarkAsUnread={false}
+            />,
+            initialState,
+        );
+        await userEvent.click(screen.getByTestId(`PostDotMenu-Button-${baseProps.post.id}`));
+        expect(screen.queryByTestId(`unread_post_${baseProps.post.id}`)).toBeNull();
+    });
+
     describe('RHS', () => {
         test.each([
             [true, {location: Locations.RHS_ROOT, isCollapsedThreadsEnabled: true}],

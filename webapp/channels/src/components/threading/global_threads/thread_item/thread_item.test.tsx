@@ -149,6 +149,9 @@ describe('components/threading/global_threads/thread_item', () => {
         } as Channel;
         mockState = {
             entities: {
+                general: {
+                    config: {},
+                },
                 users: {
                     currentUserId: user.id,
                     profiles: {

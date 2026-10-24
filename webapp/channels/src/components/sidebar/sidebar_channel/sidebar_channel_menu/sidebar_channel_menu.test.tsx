@@ -129,6 +129,19 @@ describe('components/sidebar/sidebar_channel/sidebar_channel_menu', () => {
         expect(baseElement).toMatchSnapshot();
     });
 
+    test('should not offer Mark as Unread while read receipts are on', async () => {
+        renderWithContext(
+            <SidebarChannelMenu
+                {...baseProps}
+                isUnread={false}
+            />,
+            {entities: {general: {config: {EnableReadReceipts: 'true'}}}},
+        );
+
+        await openMenu();
+        expect(screen.queryByRole('menuitem', {name: 'Mark as Unread'})).not.toBeInTheDocument();
+    });
+
     test('should show correct menu items when channel is favorite', async () => {
         const props = {
             ...baseProps,

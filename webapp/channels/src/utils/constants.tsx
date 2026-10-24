@@ -1003,7 +1003,6 @@ export const AdvancedSections = {
     FORMATTING: 'formatting',
     JOIN_LEAVE: 'joinLeave',
     PERFORMANCE_DEBUGGING: 'performanceDebugging',
-    READ_RECEIPTS: 'readReceipts',
     SYNC_DRAFTS: 'syncDrafts',
 };
 

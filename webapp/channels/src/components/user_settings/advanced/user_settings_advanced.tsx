@@ -21,7 +21,6 @@ import {a11yFocus} from 'utils/utils';
 
 import JoinLeaveSection from './join_leave_section';
 import PerformanceDebuggingSection from './performance_debugging_section';
-import ReadReceiptsSection from './read_receipts_section';
 import WysiwygEditorSection from './wysiwyg_editor_section';
 
 import SettingDesktopHeader from '../headers/setting_desktop_header';
@@ -742,14 +741,6 @@ export default class AdvancedSettingsDisplay extends React.PureComponent<Props, 
                         areAllSectionsInactive={this.props.activeSection === ''}
                         onUpdateSection={this.handleUpdateSection}
                         renderOnOffLabel={this.renderOnOffLabel}
-                        adminMode={this.props.adminMode}
-                        userPreferences={this.props.userPreferences}
-                        userId={this.props.user.id}
-                    />
-                    <ReadReceiptsSection
-                        active={this.props.activeSection === AdvancedSections.READ_RECEIPTS}
-                        areAllSectionsInactive={this.props.activeSection === ''}
-                        onUpdateSection={this.handleUpdateSection}
                         adminMode={this.props.adminMode}
                         userPreferences={this.props.userPreferences}
                         userId={this.props.user.id}
