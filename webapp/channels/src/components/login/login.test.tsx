@@ -122,14 +122,33 @@ describe('components/login/Login', () => {
         nock.cleanAll();
     });
 
-    it('should match snapshot', () => {
+    it('should show no methods when the OIDC plugin is unavailable', async () => {
+        TestHelper.initBasic(Client4);
+        nock(Client4.getUrl()).get('/plugins/mattermost-oidc/api/v1/config').reply(404);
         renderWithContext(
             <Login/>,
             baseState,
         );
 
-        expect(screen.queryByText('This server doesn’t have any sign-in methods enabled')).toBeVisible();
+        expect(await screen.findByText('This server doesn’t have any sign-in methods enabled')).toBeVisible();
         expect(screen.queryByText('Log in to your account')).not.toBeInTheDocument();
+    });
+
+    it('should offer OIDC when password and native SSO login are disabled', async () => {
+        TestHelper.initBasic(Client4);
+        nock(Client4.getUrl()).get('/plugins/mattermost-oidc/api/v1/config').reply(200, {
+            enable: true,
+            button_text: 'Keycloak',
+            button_color: '#0058CC',
+        });
+        const history = createMemoryHistory({initialEntries: ['/login?oidc_manual=1&redirect_to=%2F568e%2Fchannels%2Ftown-square']});
+
+        renderWithContext(<Login/>, baseState, {history});
+
+        const link = await screen.findByRole('link', {name: /Keycloak/});
+        expect(link).toHaveAttribute('href', `${Client4.getUrl()}/plugins/mattermost-oidc/oauth2/connect?return_to=%2F568e%2Fchannels%2Ftown-square`);
+        expect(screen.queryByText('This server doesn’t have any sign-in methods enabled')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
     });
 
     it('should match snapshot with base login', () => {

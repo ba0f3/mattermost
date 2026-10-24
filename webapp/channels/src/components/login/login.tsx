@@ -57,6 +57,7 @@ import type {GlobalState} from 'types/store';
 
 import GuestMagicLinkCard from './guest_magic_link_card';
 import LoginMfa from './login_mfa';
+import OIDCPluginLogin from './oidc_plugin_login';
 
 import './login.scss';
 
@@ -934,9 +935,14 @@ const Login = ({onCustomizeHeader}: LoginProps) => {
 
         if (!enableBaseLogin && !enableExternalSignup) {
             return (
-                <ColumnLayout
-                    title={formatMessage({id: 'login.noMethods.title', defaultMessage: 'This server doesn’t have any sign-in methods enabled'})}
-                    message={formatMessage({id: 'login.noMethods.subtitle', defaultMessage: 'Please contact your System Administrator to resolve this.'})}
+                <OIDCPluginLogin
+                    search={search}
+                    fallback={
+                        <ColumnLayout
+                            title={formatMessage({id: 'login.noMethods.title', defaultMessage: 'This server doesn’t have any sign-in methods enabled'})}
+                            message={formatMessage({id: 'login.noMethods.subtitle', defaultMessage: 'Please contact your System Administrator to resolve this.'})}
+                        />
+                    }
                 />
             );
         }
