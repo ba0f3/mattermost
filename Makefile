@@ -55,11 +55,14 @@ IMAGE_TAG ?= dev
 # host even when developing on Apple Silicon or another arm64 machine.
 PLATFORM ?= linux/amd64
 IMAGE_HTTP_PORT ?= 18765
+IMAGE_PACKAGE ?= $(CURDIR)/$(SERVER_DIR)/dist/mattermost-team-linux-amd64.tar.gz
+# Reuse the packaged build by default, including when changing the image tag.
+IMAGE_REBUILD ?= false
 # PWD stays at the repo root for `make -C server`, so point GOBIN at server/bin.
 IMAGE_GOBIN := $(CURDIR)/$(SERVER_DIR)/bin
 HOST_ARCH := $(shell uname -m)
-# Rebuild the production web client before packaging. Set to false to reuse the
-# existing webapp/channels/dist (useful when the dev server is running).
+# Controls `make build`; `make image` reuses IMAGE_PACKAGE when it exists.
+# Set to false only when the existing webapp dist is already a production build.
 IMAGE_BUILD_CLIENT ?= true
 
 # watch: webpack --watch, assets served by the Go server (port 8065)
@@ -71,7 +74,7 @@ else
 WEB_TARGET := run
 endif
 
-.PHONY: help start stop restart start-app stop-app restart-app start-web stop-web restart-web status logs logs-app logs-web stop-all deps admin plugin-install image image-push
+.PHONY: help start stop restart start-app stop-app restart-app start-web stop-web restart-web status logs logs-app logs-web stop-all deps admin plugin-install build package image image-push
 
 help: ## Show this help
 	@printf 'Mattermost dev targets:\n\n'
@@ -139,19 +142,32 @@ plugin-install: ## Build and deploy the Agents plugin (the app must be running)
 	MM_SERVICESETTINGS_SITEURL="$${MM_SERVICESETTINGS_SITEURL}" \
 	$(MAKE) -C $(PLUGIN_DIR) deploy MM_SERVICESETTINGS_ENABLEDEVELOPER=true
 
-image: ## Build the runtime Mattermost image (default PLATFORM=linux/amd64)
-	if [ "$(HOST_ARCH)" != "x86_64" ]; then
-		echo "Note: building $(PLATFORM) on $(HOST_ARCH) needs binfmt/QEMU."
-		echo "      Docker Desktop has it; on Linux: docker run --privileged --rm tonistiigi/binfmt --install amd64"
-	fi
+build: ## Build production server + web client and create the linux/amd64 package
 	$(MAKE) -C $(SERVER_DIR) PWD=$(CURDIR)/$(SERVER_DIR) GOBIN=$(IMAGE_GOBIN) build-linux-amd64
 ifeq ($(IMAGE_BUILD_CLIENT),true)
 	$(MAKE) -C $(WEBAPP_DIR) dist
 endif
+	$(MAKE) package
+ifeq ($(IMAGE_BUILD_CLIENT),true)
+	echo "Rebuilt webapp/channels/dist; run 'make restart-web' if the dev server is running."
+endif
+
+package: ## Package existing production binaries and web client without rebuilding
 	$(MAKE) -C $(SERVER_DIR) PWD=$(CURDIR)/$(SERVER_DIR) GOBIN=$(IMAGE_GOBIN) package-linux-amd64 PLUGIN_PACKAGES=
-	TARBALL=$$(ls $(CURDIR)/$(SERVER_DIR)/dist/mattermost-*-linux-amd64.tar.gz | head -n1)
-	if [ -z "$$TARBALL" ]; then
-		echo "No Mattermost package tarball was produced" >&2
+
+image: ## Create the runtime image from the existing package (IMAGE_REBUILD=true to rebuild)
+	@if [ "$(HOST_ARCH)" != "x86_64" ]; then
+		echo "Note: building $(PLATFORM) on $(HOST_ARCH) needs binfmt/QEMU."
+		echo "      Docker Desktop has it; on Linux: docker run --privileged --rm tonistiigi/binfmt --install amd64"
+	fi
+	TARBALL="$(abspath $(IMAGE_PACKAGE))"
+	if [ "$(IMAGE_REBUILD)" = "true" ] || [ ! -s "$$TARBALL" ]; then
+		$(MAKE) build
+	else
+		echo "Reusing $$TARBALL (run 'make build' to include source changes)"
+	fi
+	if [ ! -s "$$TARBALL" ]; then
+		echo "No Mattermost package found at $$TARBALL" >&2
 		exit 1
 	fi
 	echo "Building $(IMAGE):$(IMAGE_TAG) for $(PLATFORM) from $$TARBALL"
@@ -180,9 +196,6 @@ endif
 		-f $(SERVER_DIR)/build/Dockerfile \
 		$(SERVER_DIR)/build
 	echo "Built $(IMAGE):$(IMAGE_TAG) ($(PLATFORM))"
-ifeq ($(IMAGE_BUILD_CLIENT),true)
-	echo "Rebuilt webapp/channels/dist; run 'make restart-web' if the dev server is running."
-endif
 
 image-push: ## Push the runtime image built by `make image` to GHCR
 	docker push "$(IMAGE):$(IMAGE_TAG)"

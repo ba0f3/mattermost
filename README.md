@@ -171,8 +171,13 @@ make -C webapp dist   # production build into webapp/channels/dist
 ## Build a production image
 
 ```bash
-make image
+make build    # compile the production server + web client, then package them
+make image    # create the image from that package without compiling again
 ```
+
+`make image` reuses the existing package, including after source changes or when
+changing the image tag. Run `make build` to update the package. If no package exists,
+`make image` runs `make build` automatically.
 
 Defaults:
 
@@ -181,16 +186,19 @@ Defaults:
 | `IMAGE` | `ghcr.io/<git-remote-owner>/mattermost-team-edition` | Image repository |
 | `IMAGE_TAG` | `dev` | Image tag |
 | `PLATFORM` | `linux/amd64` | Target platform |
-| `IMAGE_BUILD_CLIENT` | `true` | Rebuild the production web client first |
+| `IMAGE_REBUILD` | `false` | Run `make build` before creating the image |
+| `IMAGE_PACKAGE` | `server/dist/mattermost-team-linux-amd64.tar.gz` | Existing package to put in the image |
+| `IMAGE_BUILD_CLIENT` | `true` | Build the production web client during `make build` |
 | `IMAGE_HTTP_PORT` | `18765` | Temporary local port used to feed the package to Docker |
 
-What `make image` does:
+What `make build` does:
 
 1. cross-compiles the server for `linux/amd64` (works on arm64 hosts);
 2. builds the production web client unless `IMAGE_BUILD_CLIENT=false`;
-3. packages Mattermost (`server/dist/mattermost-team-linux-amd64.tar.gz`);
-4. builds `server/build/Dockerfile` with `docker buildx --platform linux/amd64` and
-   loads the image locally.
+3. packages Mattermost (`server/dist/mattermost-team-linux-amd64.tar.gz`).
+
+`make image` builds `server/build/Dockerfile` from that package using
+`docker buildx --platform linux/amd64` and loads the image locally.
 
 Examples:
 
@@ -198,11 +206,12 @@ Examples:
 # custom tag and repository
 make image IMAGE=ghcr.io/ba0f3/mattermost-team-edition IMAGE_TAG=12.1.0
 
-# reuse the existing dev webapp dist (faster, larger image)
-make image IMAGE_BUILD_CLIENT=false
+# rebuild everything and create the image in one command
+make image IMAGE_REBUILD=true
 
-# build for another platform
-make image PLATFORM=linux/arm64
+# package manually built production binaries and web client, then create the image
+make package
+make image
 ```
 
 Push to GHCR (requires a token with `write:packages`):
@@ -222,7 +231,7 @@ Notes:
   ```
 
   Docker Desktop (Apple Silicon) includes this automatically.
-- `IMAGE_BUILD_CLIENT=true` replaces `webapp/channels/dist` with a production build.
+- `make build IMAGE_BUILD_CLIENT=true` replaces `webapp/channels/dist` with a production build.
   If the dev server is running, restart the web client afterwards:
   `make restart-web`.
 - The image does not bundle prepackaged plugins (`package-linux-amd64` runs with an
@@ -252,7 +261,9 @@ docker compose -f deploy/production/docker-compose.yml up -d
 | `make admin` | Create the local admin user |
 | `make plugin-install` | Build and deploy the Agents plugin |
 | `make stop-all` | Stop app, web and Docker services |
-| `make image` | Build the runtime image |
+| `make build` | Build production binaries, web client and package |
+| `make package` | Package existing production binaries and web client |
+| `make image` | Create the runtime image from the existing package |
 | `make image-push` | Push the runtime image |
 
 ## Troubleshooting
