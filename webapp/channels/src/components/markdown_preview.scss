@@ -111,4 +111,22 @@
             }
         }
     }
+
+    &__mermaid {
+        overflow: auto;
+        margin: 0 0 1em;
+
+        img {
+            max-width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            background: #fff;
+        }
+    }
+
+    &__mermaid-error {
+        margin-top: -0.5em;
+        font-size: 12px;
+        opacity: 0.72;
+    }
 }

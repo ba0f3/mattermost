@@ -26003,6 +26003,10 @@
     "defaultMessage": "Click to call {phoneNumber}",
     "description": "Tooltip shown when hovering a phone number link in a message."
   },
+  "markdown_preview.mermaid_error": {
+    "defaultMessage": "This diagram could not be rendered.",
+    "description": "Note shown under a Mermaid code block in a Markdown file preview when the diagram fails, times out, or is too large to render."
+  },
   "markdown_preview.preview": {
     "defaultMessage": "Preview",
     "description": "Toggle button in the file preview modal for a Markdown attachment; shows the file rendered as formatted Markdown."

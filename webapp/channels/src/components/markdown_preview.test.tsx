@@ -11,6 +11,8 @@ import {renderWithContext, screen, userEvent, waitFor} from 'tests/react_testing
 import Constants from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
 
+import createMermaidWorker from './create_mermaid_worker';
+
 describe('components/MarkdownPreview', () => {
     const fileUrl = 'https://example.com/api/v4/files/file_id';
     const requiredProps = {
@@ -183,6 +185,31 @@ describe('components/MarkdownPreview', () => {
 
         expect(screen.getByRole('heading', {name: 'Heading'})).toBeInTheDocument();
         expect(screen.queryByTestId('markdown-preview-source')).not.toBeInTheDocument();
+    });
+
+    test('should render mermaid code blocks as images and keep the surrounding markdown', async () => {
+        const worker = {
+            onmessage: null as ((event: MessageEvent) => void) | null,
+            postMessage: jest.fn(() => setTimeout(() => worker.onmessage?.({data: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'} as MessageEvent))),
+            terminate: jest.fn(),
+        };
+        (createMermaidWorker as jest.Mock).mockReturnValue(worker);
+        URL.createObjectURL = jest.fn(() => 'blob:http://localhost:8065/diagram');
+        URL.revokeObjectURL = jest.fn();
+
+        const raw = '# Before\n\n```mermaid\ngraph TD; A-->B\n```\n\n**After**';
+        await renderAndWaitForPreview(raw);
+
+        expect(await screen.findByTestId('markdown-preview-mermaid')).toHaveAttribute('src', 'blob:http://localhost:8065/diagram');
+        expect(screen.getByRole('heading', {name: 'Before'})).toBeInTheDocument();
+        expect(screen.getByText('After').tagName).toBe('STRONG');
+        expect(worker.postMessage).toHaveBeenCalledWith('graph TD; A-->B');
+
+        await userEvent.click(screen.getByRole('button', {name: 'Source'}));
+
+        expect(screen.getByTestId('markdown-preview-source').textContent).toBe(raw);
+        expect(screen.queryByTestId('markdown-preview-mermaid')).not.toBeInTheDocument();
+        expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:http://localhost:8065/diagram');
     });
 
     test('should render .markdown files', async () => {

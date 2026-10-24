@@ -6492,6 +6492,7 @@
   "mark_as_read_confirm_modal.confirm": "Đánh dấu đã đọc",
   "mark_as_read_confirm_modal.header": "Đánh dấu đã đọc",
   "markdown_phone_link.tooltip": "Nhấp để gọi {phoneNumber}",
+  "markdown_preview.mermaid_error": "Không thể hiển thị sơ đồ này.",
   "markdown_preview.preview": "Xem trước",
   "markdown_preview.source": "Mã nguồn",
   "markdown_preview.view_mode": "Chế độ xem Markdown",
