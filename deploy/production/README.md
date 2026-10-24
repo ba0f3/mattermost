@@ -56,6 +56,19 @@ Healthcheck dùng mmctl qua Unix socket nội bộ. Local mode được bật ch
 
 Các biến `MM_OPENIDSETTINGS_*` dành cho OIDC native, mặc định tắt. Chỉ bật khi image có provider Enterprise và license phù hợp. Plugin `mattermost-oidc` có backend và cấu hình riêng; cài plugin trong image hoặc tạm bật `MM_PLUGINSETTINGS_ENABLEUPLOADS`, cài qua System Console rồi tắt lại. Callback URL phải lấy theo provider/plugin đang dùng.
 
+Để chỉ đăng nhập qua plugin OIDC, bật plugin và xác nhận đăng nhập được, sau đó đặt trong `.env`:
+
+```dotenv
+MM_EMAILSETTINGS_ENABLESIGNINWITHEMAIL=false
+MM_EMAILSETTINGS_ENABLESIGNINWITHUSERNAME=false
+MM_EMAILSETTINGS_ENABLESIGNUPWITHEMAIL=false
+MM_OPENIDSETTINGS_ENABLE=false
+```
+
+Khi không có phương thức native nào bật, trang login của fork kiểm tra cấu hình công khai tại `/plugins/mattermost-oidc/api/v1/config`. Nếu plugin bật, trình duyệt tự chuyển sang `/plugins/mattermost-oidc/oauth2/connect` và giữ đường dẫn đích trong `redirect_to`. Desktop hiện nút đăng nhập và mở popup khi bấm. Nếu plugin không có hoặc tắt, trang vẫn báo không có phương thức đăng nhập.
+
+Dùng `/login?oidc_manual=1` để hiện nút OIDC mà không tự chuyển hướng. Trang login có `extra` hoặc `error` cũng giữ nút để người dùng chủ động thử lại. Sau khi đổi env, triển khai lại container để áp dụng; image phải chứa bản sửa trang login này.
+
 ## Dữ liệu và nâng cấp
 
 File đính kèm lưu ở S3. Docker volumes giữ config, plugin, dữ liệu tạm của import/export và index. Log console được Docker xoay vòng. Backup database, bucket, `.env` và các volumes cần giữ trước khi đổi image. Không dùng `docker compose down -v` khi muốn giữ dữ liệu.
