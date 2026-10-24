@@ -9418,8 +9418,6 @@ func TestGetThreadsForUser_AfterTeamRemovalAndReinvite(t *testing.T) {
 func TestThreadSocketEvents(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
-	// Marking unread is refused while read receipts are enabled (the default).
-	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.ConfigStore.SetReadOnlyFF(false)
 	defer th.ConfigStore.SetReadOnlyFF(true)
@@ -10061,8 +10059,6 @@ func TestMaintainUnreadMentionsInThread(t *testing.T) {
 func TestReadThreads(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
-	// Marking unread is refused while read receipts are enabled (the default).
-	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.ServiceSettings.ThreadAutoFollow = true
@@ -11370,8 +11366,6 @@ func TestUpdateReadStateThreadByUser(t *testing.T) {
 func TestSetUnreadThreadByPostId(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
-	// Marking unread is refused while read receipts are enabled (the default).
-	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	client := th.Client
 	user := th.BasicUser

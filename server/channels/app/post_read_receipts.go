@@ -22,9 +22,10 @@ import (
 // Semantics: a user has "seen" a post when their ChannelMembers.LastViewedAt
 // for the post's channel is >= post.CreateAt. This means the user viewed (or
 // marked as read) the channel after the post was created; it does NOT prove
-// the message itself was read. While read receipts are enabled, the APIs
-// that would move LastViewedAt back (marking a post, thread or channel
-// unread) are refused, so once a user has seen a post they stay listed.
+// the message itself was read. Marking a channel unread from an earlier post
+// (stock Mattermost "Mark as Unread") lowers LastViewedAt, so a viewer can
+// drop out of a seen-by list again; this is accepted, stock behavior and is
+// not refused while read receipts are enabled.
 //
 // Privacy rules (secaudit):
 //   - only the post author, while still a channel member, may read the list;
@@ -133,16 +134,6 @@ func (s *Server) readReceiptsLimiters() *readReceiptsLimiters {
 
 func (a *App) readReceiptsEnabled() bool {
 	return model.SafeDereference(a.Config().ServiceSettings.EnableReadReceipts)
-}
-
-// CheckMarkUnreadAllowed refuses moving a read pointer backward (marking a
-// post, channel or thread unread) while read receipts are enabled, so users
-// cannot hide that they have read a message.
-func (a *App) CheckMarkUnreadAllowed() *model.AppError {
-	if a.readReceiptsEnabled() {
-		return model.NewAppError("CheckMarkUnreadAllowed", "api.post.set_unread.read_receipts_enabled.app_error", nil, "", http.StatusForbidden)
-	}
-	return nil
 }
 
 // readReceiptsChannelInScope reports whether read receipts apply to channel:

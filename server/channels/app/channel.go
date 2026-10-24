@@ -3386,13 +3386,7 @@ func (a *App) ValidateUserPermissionsOnChannels(rctx request.CTX, userId string,
 }
 
 // MarkChanelAsUnreadFromPost will take a post and set the channel as unread from that one.
-// It is the only path that moves a channel member's LastViewedAt backward and
-// is refused while read receipts are enabled.
 func (a *App) MarkChannelAsUnreadFromPost(rctx request.CTX, postID string, userID string, collapsedThreadsSupported bool) (*model.ChannelUnreadAt, *model.AppError) {
-	if appErr := a.CheckMarkUnreadAllowed(); appErr != nil {
-		return nil, appErr
-	}
-
 	if !collapsedThreadsSupported || !a.IsCRTEnabledForUser(rctx, userID) {
 		return a.markChannelAsUnreadFromPostCRTUnsupported(rctx, postID, userID)
 	}

@@ -630,10 +630,11 @@ func TestGetPostsSeenStatusDeletedPost(t *testing.T) {
 	requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
 }
 
-func TestMarkUnreadWithReadReceipts(t *testing.T) {
+func TestMarkUnreadAllowedWithReadReceipts(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := setupReadReceipts(t)
 	ctx := context.Background()
+	require.True(t, *th.App.Config().ServiceSettings.EnableReadReceipts)
 
 	// th.Client is the author, th.BasicUser.
 	viewer := th.BasicUser2
@@ -646,79 +647,38 @@ func TestMarkUnreadWithReadReceipts(t *testing.T) {
 	post := th.CreatePostWithClient(t, th.Client, channel)
 	readReceiptsView(t, th, viewer.Id, channel.Id)
 
-	requireSeen := func(t *testing.T) {
-		t.Helper()
-		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
-		require.NoError(t, err)
-		require.Contains(t, seen.UserIds, viewer.Id)
-		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
-		require.NoError(t, err)
-		require.Equal(t, map[string]bool{post.Id: true}, status.Seen)
-	}
-	requireSeen(t)
+	seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+	require.NoError(t, err)
+	require.Contains(t, seen.UserIds, viewer.Id)
 
-	member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
-	require.Nil(t, appErr)
-	viewedAt := member.LastViewedAt
-	require.GreaterOrEqual(t, viewedAt, post.CreateAt)
-
-	const refusedID = "api.post.set_unread.read_receipts_enabled.app_error"
-
-	t.Run("enabled: post set_unread is refused and the author still sees it as seen", func(t *testing.T) {
-		_, err := viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, true)
-		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
-		_, err = viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, false)
-		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
-
-		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
-		require.Nil(t, appErr)
-		require.Equal(t, viewedAt, member.LastViewedAt)
-		requireSeen(t)
-	})
-
-	t.Run("enabled: thread set_unread is refused without side effects", func(t *testing.T) {
-		before, appErr := th.App.GetThreadMembershipForUser(viewer.Id, root.Id)
-		require.Nil(t, appErr)
-
-		_, _, err := viewerClient.SetThreadUnreadByPostId(ctx, viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
-		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
-
-		after, appErr := th.App.GetThreadMembershipForUser(viewer.Id, root.Id)
-		require.Nil(t, appErr)
-		require.Equal(t, before.LastViewed, after.LastViewed)
-		require.Equal(t, before.Following, after.Following)
-		requireSeen(t)
-	})
-
-	t.Run("enabled: permission checks still run first", func(t *testing.T) {
-		_, err := th.Client.SetPostUnread(ctx, viewer.Id, post.Id, true)
-		requireAppErrorID(t, err, http.StatusForbidden, "api.context.permissions.app_error")
-	})
-
-	t.Run("enabled: app callers are refused too", func(t *testing.T) {
-		_, appErr := th.App.MarkChannelAsUnreadFromPost(th.Context, post.Id, viewer.Id, true)
-		require.NotNil(t, appErr)
-		require.Equal(t, refusedID, appErr.Id)
-		_, appErr = th.App.UpdateThreadReadForUserByPost(th.Context, "", viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
-		require.NotNil(t, appErr)
-		require.Equal(t, refusedID, appErr.Id)
-		requireSeen(t)
-	})
-
-	t.Run("disabled: set_unread works as before", func(t *testing.T) {
-		th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
-		defer th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(true) })
-
+	t.Run("post set_unread works with read receipts enabled", func(t *testing.T) {
 		resp, err := viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, true)
 		require.NoError(t, err)
 		CheckOKStatus(t, resp)
+
 		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
 		require.Nil(t, appErr)
 		require.Equal(t, post.CreateAt-1, member.LastViewedAt)
 
+		// Stock Mark as Unread lowers LastViewedAt, so the viewer drops out
+		// of the seen-by list again (accepted behavior).
+		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		require.NoError(t, err)
+		require.NotContains(t, seen.UserIds, viewer.Id)
+		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{post.Id: false}, status.Seen)
+	})
+
+	t.Run("thread set_unread works with read receipts enabled", func(t *testing.T) {
 		thread, resp, err := viewerClient.SetThreadUnreadByPostId(ctx, viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
 		require.NoError(t, err)
 		CheckOKStatus(t, resp)
 		require.Equal(t, root.Id, thread.PostId)
+	})
+
+	t.Run("permission checks still apply", func(t *testing.T) {
+		_, err := th.Client.SetPostUnread(ctx, viewer.Id, post.Id, true)
+		requireAppErrorID(t, err, http.StatusForbidden, "api.context.permissions.app_error")
 	})
 }

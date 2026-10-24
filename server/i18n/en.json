@@ -4155,11 +4155,6 @@
     "description": "Mobile push notification body appended after the sender's name for a direct message; no leading space in source, sender name precedes it."
   },
   {
-    "id": "api.post.set_unread.read_receipts_enabled.app_error",
-    "translation": "Messages can't be marked as unread while read receipts are enabled.",
-    "description": "Error returned when a user tries to mark a post, channel or thread as unread while read receipts are enabled, because that would hide that they have read it."
-  },
-  {
     "id": "api.post.update_post.burn_on_read.app_error",
     "translation": "Burn-on-read posts cannot be edited.",
     "description": "API error when editing a burn-on-read (self-destructing) post, which is not allowed."

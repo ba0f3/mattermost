@@ -4130,11 +4130,6 @@ func setUnreadThreadByPostId(c *Context, w http.ResponseWriter, r *http.Request)
 	if !isMember {
 		model.AddEventParameterToAuditRec(auditRec, "non_channel_member_access", true)
 	}
-	// Refuse before following the thread so a refused request has no side effects.
-	if appErr := c.App.CheckMarkUnreadAllowed(); appErr != nil {
-		c.Err = appErr
-		return
-	}
 
 	// We want to make sure the thread is followed when marking as unread
 	// https://mattermost.atlassian.net/browse/MM-36430
