@@ -1,11 +1,31 @@
 .PostSeenIndicator {
     display: inline-flex;
     align-items: center;
+    padding: 0;
+    border: none;
     margin-left: 4px;
+    background: none;
     color: rgba(var(--center-channel-color-rgb), 0.48);
+    cursor: pointer;
+
+    &:hover,
+    &:focus-visible {
+        color: rgba(var(--center-channel-color-rgb), 0.72);
+    }
+
+    &:focus-visible {
+        border-radius: var(--radius-xs);
+        outline: 2px solid var(--button-bg);
+        outline-offset: 2px;
+    }
 
     &--seen {
         color: var(--button-bg);
+
+        &:hover,
+        &:focus-visible {
+            color: var(--button-bg);
+        }
     }
 }
 

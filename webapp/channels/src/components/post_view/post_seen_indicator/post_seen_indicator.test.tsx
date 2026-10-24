@@ -7,7 +7,10 @@ import type {DeepPartial} from '@mattermost/types/utilities';
 
 import {getPostsSeenStatusBatched} from 'mattermost-redux/actions/read_receipts';
 
-import {renderWithContext, screen} from 'tests/react_testing_utils';
+import {openModal} from 'actions/views/modals';
+
+import {renderWithContext, screen, userEvent} from 'tests/react_testing_utils';
+import {ModalIdentifiers} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
 
 import type {GlobalState} from 'types/store';
@@ -16,6 +19,11 @@ import PostSeenIndicator from './post_seen_indicator';
 
 jest.mock('mattermost-redux/actions/read_receipts', () => ({
     getPostsSeenStatusBatched: jest.fn(() => ({type: 'MOCK_GET_POSTS_SEEN_STATUS_BATCHED'})),
+}));
+
+jest.mock('actions/views/modals', () => ({
+    ...jest.requireActual('actions/views/modals'),
+    openModal: jest.fn((data) => ({type: 'MOCK_OPEN_MODAL', ...data})),
 }));
 
 describe('PostSeenIndicator', () => {
@@ -37,12 +45,13 @@ describe('PostSeenIndicator', () => {
 
     beforeEach(() => {
         jest.mocked(getPostsSeenStatusBatched).mockClear();
+        jest.mocked(openModal).mockClear();
     });
 
     test('shows a single check when sent and queues a status fetch', () => {
         renderWithContext(<PostSeenIndicator post={post}/>, makeState());
 
-        const indicator = screen.getByRole('img', {name: 'Sent'});
+        const indicator = screen.getByRole('button', {name: 'Sent'});
         expect(indicator).not.toHaveClass('PostSeenIndicator--seen');
         expect(getPostsSeenStatusBatched).toHaveBeenCalledWith([post.id]);
     });
@@ -50,14 +59,14 @@ describe('PostSeenIndicator', () => {
     test('shows a single check without refetching once the status is known', () => {
         renderWithContext(<PostSeenIndicator post={post}/>, makeState({entities: {readReceipts: {seenStatus: {[post.id]: false}}}}));
 
-        expect(screen.getByRole('img', {name: 'Sent'})).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: 'Sent'})).toBeInTheDocument();
         expect(getPostsSeenStatusBatched).not.toHaveBeenCalled();
     });
 
     test('shows a double check when seen', () => {
         renderWithContext(<PostSeenIndicator post={post}/>, makeState({entities: {readReceipts: {seenStatus: {[post.id]: true}}}}));
 
-        expect(screen.getByRole('img', {name: 'Seen'})).toHaveClass('PostSeenIndicator--seen');
+        expect(screen.getByRole('button', {name: 'Seen'})).toHaveClass('PostSeenIndicator--seen');
     });
 
     test.each([
@@ -70,6 +79,19 @@ describe('PostSeenIndicator', () => {
 
         expect(screen.queryByTestId(`post_seen_indicator_${post.id}`)).not.toBeInTheDocument();
         expect(getPostsSeenStatusBatched).not.toHaveBeenCalled();
+    });
+
+    test('opens the Seen by modal when the indicator is clicked', async () => {
+        const user = userEvent.setup();
+        renderWithContext(<PostSeenIndicator post={post}/>, makeState({entities: {readReceipts: {seenStatus: {[post.id]: true}}}}));
+
+        await user.click(screen.getByRole('button', {name: 'Seen'}));
+
+        expect(openModal).toHaveBeenCalledWith({
+            modalId: ModalIdentifiers.POST_SEEN_BY,
+            dialogType: expect.any(Function),
+            dialogProps: {postId: post.id},
+        });
     });
 
     test('renders nothing on someone else\'s post', () => {
