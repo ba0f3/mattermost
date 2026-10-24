@@ -1472,12 +1472,6 @@ func unpinPost(c *Context, w http.ResponseWriter, _ *http.Request) {
 }
 
 func acknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
-	// license check
-	if !model.MinimumProfessionalLicense(c.App.Srv().License()) {
-		c.Err = model.NewAppError("", model.NoTranslation, nil, "feature is not available for the current license", http.StatusNotImplemented)
-		return
-	}
-
 	c.RequirePostId().RequireUserId()
 	if c.Err != nil {
 		return
@@ -1511,12 +1505,6 @@ func acknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func unacknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
-	// license check
-	if !model.MinimumProfessionalLicense(c.App.Srv().License()) {
-		c.Err = model.NewAppError("", "license_error.feature_unavailable", nil, "feature is not available for the current license", http.StatusNotImplemented)
-		return
-	}
-
 	c.RequirePostId().RequireUserId()
 	if c.Err != nil {
 		return

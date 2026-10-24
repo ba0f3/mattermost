@@ -546,11 +546,11 @@ func TestCreatePostForPriority(t *testing.T) {
 		CheckBadRequestStatus(t, resp)
 	})
 
-	t.Run("should return statusNotImplemented when min. pro. license not available", func(t *testing.T) {
+	t.Run("should allow acknowledgement request but not persistent notifications without min. pro. license", func(t *testing.T) {
 		appErr := th.App.Srv().RemoveLicense()
 		require.Nil(t, appErr)
 		defer th.App.Srv().SetLicense(model.NewTestLicenseSKU(model.LicenseShortSkuProfessional))
-		//  for Acknowledment
+		//  for Acknowledment: no license required
 		p1 := &model.Post{ChannelId: th.BasicChannel.Id, Message: "test", Metadata: &model.PostMetadata{
 			Priority: &model.PostPriority{
 				Priority:     new("urgent"),
@@ -558,10 +558,10 @@ func TestCreatePostForPriority(t *testing.T) {
 			},
 		}}
 		_, resp, err := client.CreatePost(context.Background(), p1)
-		require.Error(t, err)
-		CheckNotImplementedStatus(t, resp)
+		require.NoError(t, err)
+		CheckCreatedStatus(t, resp)
 
-		//  for Persistent Notification
+		//  for Persistent Notification: still requires a license
 		p2 := &model.Post{ChannelId: th.BasicChannel.Id, Message: "test", Metadata: &model.PostMetadata{
 			Priority: &model.PostPriority{
 				Priority:                new("urgent"),
@@ -7260,7 +7260,8 @@ func TestAcknowledgePost(t *testing.T) {
 	mainHelper.Parallel(t)
 
 	th := Setup(t).InitBasic(t)
-	th.App.Srv().SetLicense(model.NewTestLicenseSKU(model.LicenseShortSkuProfessional))
+	// Post acknowledgements do not require a license.
+	require.Nil(t, th.App.Srv().RemoveLicense())
 	client := th.Client
 
 	post := th.BasicPost
@@ -7302,7 +7303,8 @@ func TestUnacknowledgePost(t *testing.T) {
 	mainHelper.Parallel(t)
 
 	th := Setup(t).InitBasic(t)
-	th.App.Srv().SetLicense(model.NewTestLicenseSKU(model.LicenseShortSkuProfessional))
+	// Post acknowledgements do not require a license.
+	require.Nil(t, th.App.Srv().RemoveLicense())
 	client := th.Client
 
 	post := th.BasicPost
@@ -7342,6 +7344,85 @@ func TestUnacknowledgePost(t *testing.T) {
 	resp, err = client.UnacknowledgePost(context.Background(), post.Id, th.BasicUser.Id)
 	require.Error(t, err)
 	CheckUnauthorizedStatus(t, resp)
+}
+
+func TestPostAcknowledgementPermissions(t *testing.T) {
+	mainHelper.Parallel(t)
+
+	th := Setup(t).InitBasic(t)
+	// Post acknowledgements do not require a license.
+	require.Nil(t, th.App.Srv().RemoveLicense())
+	client := th.Client
+
+	// BasicUser2 is on the team but not a member of this private channel.
+	privateChannel := th.CreatePrivateChannel(t)
+	privatePost := th.CreatePostWithClient(t, client, privateChannel)
+	_, _, err := client.AcknowledgePost(context.Background(), privatePost.Id, th.BasicUser.Id)
+	require.NoError(t, err)
+
+	outsider := th.CreateClient()
+	_, _, err = outsider.Login(context.Background(), th.BasicUser2.Email, th.BasicUser2.Password)
+	require.NoError(t, err)
+
+	t.Run("non-member cannot acknowledge", func(t *testing.T) {
+		_, resp, err := outsider.AcknowledgePost(context.Background(), privatePost.Id, th.BasicUser2.Id)
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+
+		acks, appErr := th.App.GetAcknowledgementsForPost(privatePost.Id)
+		require.Nil(t, appErr)
+		require.Len(t, acks, 1)
+		require.Equal(t, th.BasicUser.Id, acks[0].UserId)
+	})
+
+	t.Run("non-member cannot unacknowledge", func(t *testing.T) {
+		resp, err := outsider.UnacknowledgePost(context.Background(), privatePost.Id, th.BasicUser2.Id)
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+	})
+
+	t.Run("non-member cannot read the post or its acknowledgements", func(t *testing.T) {
+		_, resp, err := outsider.GetPost(context.Background(), privatePost.Id, "")
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+
+		_, resp, err = outsider.GetPostThread(context.Background(), privatePost.Id, "", false)
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+	})
+
+	t.Run("member can read acknowledgements", func(t *testing.T) {
+		post, _, err := client.GetPost(context.Background(), privatePost.Id, "")
+		require.NoError(t, err)
+		require.NotNil(t, post.Metadata)
+		require.Len(t, post.Metadata.Acknowledgements, 1)
+		require.Equal(t, th.BasicUser.Id, post.Metadata.Acknowledgements[0].UserId)
+	})
+
+	t.Run("user cannot acknowledge on behalf of another user", func(t *testing.T) {
+		_, resp, err := client.AcknowledgePost(context.Background(), th.BasicPost.Id, th.BasicUser2.Id)
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+
+		acks, appErr := th.App.GetAcknowledgementsForPost(th.BasicPost.Id)
+		require.Nil(t, appErr)
+		require.Empty(t, acks)
+	})
+
+	t.Run("user cannot unacknowledge on behalf of another user", func(t *testing.T) {
+		// BasicUser2 is a member of BasicChannel and acknowledges for themselves.
+		_, _, err := outsider.AcknowledgePost(context.Background(), th.BasicPost.Id, th.BasicUser2.Id)
+		require.NoError(t, err)
+
+		resp, err := client.UnacknowledgePost(context.Background(), th.BasicPost.Id, th.BasicUser2.Id)
+		require.Error(t, err)
+		CheckForbiddenStatus(t, resp)
+
+		acks, appErr := th.App.GetAcknowledgementsForPost(th.BasicPost.Id)
+		require.Nil(t, appErr)
+		require.Len(t, acks, 1)
+		require.Equal(t, th.BasicUser2.Id, acks[0].UserId)
+	})
 }
 
 func TestRestorePostVersion(t *testing.T) {
