@@ -19,7 +19,6 @@ import {
 import {WithTooltip} from '@mattermost/shared/components/tooltip';
 
 import {isChannelInManagedCategory} from 'mattermost-redux/selectors/entities/channel_categories';
-import {isReadReceiptsFeatureEnabled} from 'mattermost-redux/selectors/entities/read_receipts';
 
 import MenuItemOpenInNewWindow from 'components/channel_header_menu/menu_items/open_in_new_window';
 import ChannelInviteModal from 'components/channel_invite_modal';
@@ -58,9 +57,6 @@ const SidebarChannelMenu = ({
     const isLeaving = useRef(false);
     const isInManagedCategory = useSelector((state: GlobalState) => isChannelInManagedCategory(state, channel.id));
 
-    // Marking unread moves LastViewedAt back, which would undo a read receipt.
-    const canMarkAsUnread = !useSelector(isReadReceiptsFeatureEnabled);
-
     const {formatMessage} = useIntl();
 
     let markAsReadUnreadMenuItem: JSX.Element | null = null;
@@ -84,7 +80,7 @@ const SidebarChannelMenu = ({
             />
 
         );
-    } else if (canMarkAsUnread) {
+    } else {
         function handleMarkAsUnread() {
             markMostRecentPostInChannelAsUnread(channel.id);
         }

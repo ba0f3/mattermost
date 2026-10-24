@@ -14,7 +14,7 @@ import {getChannel} from 'mattermost-redux/selectors/entities/channels';
 import {getLicense, getConfig} from 'mattermost-redux/selectors/entities/general';
 import {getPost} from 'mattermost-redux/selectors/entities/posts';
 import {getBool, isCollapsedThreadsEnabled} from 'mattermost-redux/selectors/entities/preferences';
-import {canShowPostReadReceipts, isReadReceiptsFeatureEnabled} from 'mattermost-redux/selectors/entities/read_receipts';
+import {canShowPostReadReceipts} from 'mattermost-redux/selectors/entities/read_receipts';
 import {
     getCurrentTeamId,
     getCurrentTeam,
@@ -142,9 +142,6 @@ function makeMapStateToProps() {
             canCopyLink: !systemMessage && (!isBoRPost || isPostSender),
             canFlagContent,
             canSeeReadReceipts: canShowPostReadReceipts(state, post),
-
-            // Marking unread moves LastViewedAt back, which would undo a read receipt.
-            canMarkAsUnread: !isReadReceiptsFeatureEnabled(state),
             isBurnOnReadPost: isBoRPost,
             isUnrevealedBurnOnReadPost: shouldDisplayConcealedPlaceholder(state, post.id),
         };

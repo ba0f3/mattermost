@@ -108,7 +108,6 @@ type Props = {
     canCopyLink: boolean;
     canFlagContent?: boolean;
     canSeeReadReceipts?: boolean;
-    canMarkAsUnread?: boolean;
 
     actions: {
 
@@ -483,9 +482,6 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
 
             // mark as unread
         case Keyboard.isKeyPressed(event, Constants.KeyCodes.U):
-            if (this.props.canMarkAsUnread === false) {
-                break;
-            }
             forceCloseMenu();
             this.handleMarkPostAsUnread();
             break;
@@ -604,7 +600,7 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         const showForward = this.props.canForward;
         const showReactions = Boolean(isMobile && !isSystemMessage && !this.props.isReadOnly && this.props.enableEmojiPicker);
         const showFollowPost = this.props.canFollowThread;
-        const showMarkAsUnread = Boolean(this.props.canMarkAsUnread !== false && !isSystemMessage && !this.props.channelIsArchived && this.props.location !== Locations.SEARCH);
+        const showMarkAsUnread = Boolean(!isSystemMessage && !this.props.channelIsArchived && this.props.location !== Locations.SEARCH);
         const showSave = !isSystemMessage && !this.props.isUnrevealedBurnOnReadPost;
         const showRemind = !isSystemMessage;
         const showPin = Boolean(!isSystemMessage && !this.props.isReadOnly && !isBurnOnReadPost);

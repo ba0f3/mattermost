@@ -11,7 +11,6 @@ import type {UserThread} from '@mattermost/types/threads';
 import {setThreadFollow, updateThreadRead, markLastPostInThreadAsUnread} from 'mattermost-redux/actions/threads';
 import {getChannel} from 'mattermost-redux/selectors/entities/channels';
 import {getPost, isPostFlagged} from 'mattermost-redux/selectors/entities/posts';
-import {isReadReceiptsFeatureEnabled} from 'mattermost-redux/selectors/entities/read_receipts';
 
 import {
     flagPost as savePost,
@@ -64,9 +63,6 @@ function ThreadMenu({
     const post = useSelector((state: GlobalState) => getPost(state, threadId));
     const channel = useSelector((state: GlobalState) => getChannel(state, post.channel_id));
     const readAloud = useReadout();
-
-    // Marking unread is blocked by the server while read receipts are on.
-    const canMarkAsUnread = !useSelector(isReadReceiptsFeatureEnabled);
 
     const handleReadUnread = useCallback(() => {
         readAloud(hasUnreads ? formatMessage({
@@ -181,7 +177,6 @@ function ThreadMenu({
                     }));
                 }, [threadId, readAloud, formatMessage])}
             />
-            {(hasUnreads || canMarkAsUnread) &&
             <Menu.Item
                 labels={hasUnreads ? (
                     <FormattedMessage
@@ -196,7 +191,6 @@ function ThreadMenu({
                 )}
                 onClick={handleReadUnread}
             />
-            }
             <Menu.Item
                 labels={isSaved ? (
                     <FormattedMessage

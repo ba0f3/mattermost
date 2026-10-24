@@ -21,7 +21,6 @@ import {
     getBool,
     isCollapsedThreadsEnabled,
 } from 'mattermost-redux/selectors/entities/preferences';
-import {isReadReceiptsFeatureEnabled} from 'mattermost-redux/selectors/entities/read_receipts';
 import {getCurrentTeam, getTeam, getTeamMemberships} from 'mattermost-redux/selectors/entities/teams';
 import {getCurrentUserId, getUser} from 'mattermost-redux/selectors/entities/users';
 
@@ -239,7 +238,6 @@ function makeMapStateToProps() {
             parentPost,
             parentPostUser,
             isPostAcknowledgementsEnabled: isPostAcknowledgementsEnabled(state),
-            canMarkAsUnread: !isReadReceiptsFeatureEnabled(state),
             isPostPriorityEnabled: isPostPriorityEnabled(state),
             isCardOpen: selectedCard && selectedCard.id === post.id,
             shouldShowDotMenu: shouldShowDotMenu(state, post, channel),
