@@ -31,7 +31,8 @@ func setupReadReceipts(t *testing.T) *TestHelper {
 
 func readReceiptsView(t *testing.T, th *TestHelper, userID, channelID string) {
 	t.Helper()
-	_, appErr := th.App.MarkChannelsAsViewed(th.Context, []string{channelID}, userID, "", false, false)
+	rctx := th.Context.WithSession(&model.Session{Id: model.NewId(), UserId: userID})
+	_, appErr := th.App.MarkChannelsAsViewed(rctx, []string{channelID}, userID, "", false, false)
 	require.Nil(t, appErr)
 }
 
@@ -485,39 +486,56 @@ func TestPostSeenWebSocketEventOnBehalf(t *testing.T) {
 	viewerClient := loggedInClient(t, th, viewer)
 	authorWS := th.CreateConnectedWebSocketClient(t)
 
-	// An admin marking the channel read for the viewer emits nothing...
+	// An admin marking the channel read for the viewer emits nothing and
+	// does not count as seen...
 	onBehalf := th.CreatePostWithClient(t, th.Client, channel)
 	_, _, err := th.SystemAdminClient.ReadMultipleChannels(ctx, viewer.Id, []string{channel.Id})
 	require.NoError(t, err)
+	seen, _, err := th.Client.GetPostSeenBy(ctx, onBehalf.Id)
+	require.NoError(t, err)
+	require.Empty(t, seen.UserIds)
+	requireNoPostSeenEvent(t, authorWS, 2*time.Second)
 
-	// ...and since LastViewedAt moved, the viewer's own later view only
-	// announces posts created after it.
+	// ...so the viewer's own later view announces every post they have now
+	// seen.
 	later := th.CreatePostWithClient(t, th.Client, channel)
 	_, _, err = viewerClient.ViewChannel(ctx, viewer.Id, &model.ChannelView{ChannelId: channel.Id})
 	require.NoError(t, err)
+	require.ElementsMatch(t, []string{onBehalf.Id, later.Id}, waitForPostSeenEvents(t, authorWS, 2))
+}
 
-	// Events of one view are published together, newest post first, so keep
-	// reading for a while after the expected one arrives.
-	timeout := time.After(10 * time.Second)
-	var drain <-chan time.Time
-	gotLater := false
+// requireNoPostSeenEvent fails if ws receives a post_seen event within wait.
+func requireNoPostSeenEvent(t *testing.T, ws *model.WebSocketClient, wait time.Duration) {
+	t.Helper()
+	timeout := time.After(wait)
 	for {
 		select {
-		case event := <-authorWS.EventChannel:
-			if event.EventType() != model.WebsocketEventPostSeen {
-				continue
-			}
-			require.NotEqual(t, onBehalf.Id, event.GetData()["post_id"], "post marked read on behalf of the viewer must not be announced")
-			if event.GetData()["post_id"] == later.Id && !gotLater {
-				gotLater = true
-				drain = time.After(2 * time.Second)
-			}
-		case <-drain:
-			return
+		case event := <-ws.EventChannel:
+			require.NotEqual(t, model.WebsocketEventPostSeen, event.EventType(), "unexpected post_seen for %v", event.GetData())
 		case <-timeout:
-			require.FailNow(t, "author did not receive post_seen for the viewer's own view")
+			return
 		}
 	}
+}
+
+// waitForPostSeenEvents returns the post IDs of the first count post_seen
+// events on ws, then makes sure no further one arrives.
+func waitForPostSeenEvents(t *testing.T, ws *model.WebSocketClient, count int) []string {
+	t.Helper()
+	postIDs := []string{}
+	timeout := time.After(10 * time.Second)
+	for len(postIDs) < count {
+		select {
+		case event := <-ws.EventChannel:
+			if event.EventType() == model.WebsocketEventPostSeen {
+				postIDs = append(postIDs, event.GetData()["post_id"].(string))
+			}
+		case <-timeout:
+			require.FailNow(t, "post_seen events not received", "got %v", postIDs)
+		}
+	}
+	requireNoPostSeenEvent(t, ws, 2*time.Second)
+	return postIDs
 }
 
 func TestGetPostSeenByBotCaller(t *testing.T) {
@@ -660,14 +678,54 @@ func TestMarkUnreadAllowedWithReadReceipts(t *testing.T) {
 		require.Nil(t, appErr)
 		require.Equal(t, post.CreateAt-1, member.LastViewedAt)
 
-		// Stock Mark as Unread lowers LastViewedAt, so the viewer drops out
-		// of the seen-by list again (accepted behavior).
+		// Stock Mark as Unread lowers LastViewedAt only: the post stays seen.
 		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
 		require.NoError(t, err)
-		require.NotContains(t, seen.UserIds, viewer.Id)
+		require.Equal(t, []string{viewer.Id}, seen.UserIds)
 		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
 		require.NoError(t, err)
-		require.Equal(t, map[string]bool{post.Id: false}, status.Seen)
+		require.Equal(t, map[string]bool{post.Id: true}, status.Seen)
+	})
+
+	t.Run("viewing again after set_unread announces nothing", func(t *testing.T) {
+		authorWS := th.CreateConnectedWebSocketClient(t)
+		// Let events of the earlier views settle on other connections.
+		requireNoPostSeenEvent(t, authorWS, time.Second)
+
+		_, _, err := viewerClient.ViewChannel(ctx, viewer.Id, &model.ChannelView{ChannelId: channel.Id})
+		require.NoError(t, err)
+		requireNoPostSeenEvent(t, authorWS, 2*time.Second)
+
+		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+		require.Nil(t, appErr)
+		require.GreaterOrEqual(t, member.LastViewedAt, post.CreateAt)
+		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		require.NoError(t, err)
+		require.Equal(t, []string{viewer.Id}, seen.UserIds)
+
+		// A new post is still announced once.
+		newer := th.CreatePostWithClient(t, th.Client, channel)
+		_, _, err = viewerClient.ViewChannel(ctx, viewer.Id, &model.ChannelView{ChannelId: channel.Id})
+		require.NoError(t, err)
+		require.Equal(t, []string{newer.Id}, waitForPostSeenEvents(t, authorWS, 1))
+	})
+
+	t.Run("full-row member updates do not lower the seen pointer", func(t *testing.T) {
+		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+		require.Nil(t, appErr)
+		member.LastViewedAt = 0
+		member.MsgCount = 0
+		_, err := th.App.Srv().Store().Channel().UpdateMember(th.Context, member)
+		require.NoError(t, err)
+		_, err = th.App.Srv().Store().Channel().UpdateMultipleMembers([]*model.ChannelMember{member})
+		require.NoError(t, err)
+
+		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		require.NoError(t, err)
+		require.Equal(t, []string{viewer.Id}, seen.UserIds)
+		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{post.Id: true}, status.Seen)
 	})
 
 	t.Run("thread set_unread works with read receipts enabled", func(t *testing.T) {

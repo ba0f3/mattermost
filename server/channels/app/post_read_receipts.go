@@ -5,7 +5,6 @@ package app
 
 import (
 	"context"
-	"maps"
 	"net/http"
 	"slices"
 
@@ -19,13 +18,21 @@ import (
 
 // Read receipts ("seen by").
 //
-// Semantics: a user has "seen" a post when their ChannelMembers.LastViewedAt
-// for the post's channel is >= post.CreateAt. This means the user viewed (or
-// marked as read) the channel after the post was created; it does NOT prove
-// the message itself was read. Marking a channel unread from an earlier post
-// (stock Mattermost "Mark as Unread") lowers LastViewedAt, so a viewer can
-// drop out of a seen-by list again; this is accepted, stock behavior and is
-// not refused while read receipts are enabled.
+// Semantics: a user has "seen" a post when their read receipt seen pointer
+// (ChannelMemberSeen.SeenUpTo) for the post's channel is >= post.CreateAt.
+// This means the user viewed the channel after the post was created; it does
+// NOT prove the message itself was read. The pointer is separate from
+// ChannelMembers.LastViewedAt and is monotonic:
+//   - advanceReadReceiptSeenUpTo is its only write path. It runs when a user
+//     marks their own channels as viewed (session user == viewer, not a bot
+//     or a bot session, active user), never when an admin or plugin does it
+//     on their behalf;
+//   - the new value is computed by the database (the channel's LastPostAt,
+//     capped by now), never taken from a client, and an upsert with
+//     GREATEST never lowers it;
+//   - it lives in its own table, so member updates, imports and stock Mark as
+//     Unread (which still lowers LastViewedAt) cannot touch it: once a post
+//     shows as seen it stays seen.
 //
 // Privacy rules (secaudit):
 //   - only the post author, while still a channel member, may read the list;
@@ -44,10 +51,10 @@ import (
 //   - system messages and posts made by webhooks or bots (from_webhook /
 //     from_bot) have no receipts: GET returns the not-found 404 and the batch
 //     endpoint reports false;
-//   - post_seen events are only emitted when the session user marks their
-//     own channel as viewed (never when an admin or plugin does it on their
-//     behalf), and only for posts created after the viewer's previous
-//     LastViewedAt, so already seen posts never leak presence again.
+//   - post_seen events are only emitted when the seen pointer moves forward,
+//     and only for posts created after its previous value, so already seen
+//     posts never leak presence again (not even after Mark as Unread and a
+//     new view).
 
 const (
 	// ReadReceiptsMaxSeenStatusPosts caps the post IDs accepted by
@@ -66,8 +73,8 @@ const (
 	readReceiptsGetPerSec   = 5
 	readReceiptsGetMaxBurst = 30
 	// post_seen emission rate limits. The per viewer limit is checked first,
-	// before any database work; the per (viewer, channel) limit is a second
-	// layer. Throttled rounds are dropped (clients can always refetch the
+	// before any database work other than the seen pointer write; the per
+	// (viewer, channel) limit is a second layer. Throttled rounds are dropped (clients can always refetch the
 	// list); the channel view itself is never throttled.
 	readReceiptsEmitViewerPerMin   = 30
 	readReceiptsEmitViewerMaxBurst = 10
@@ -326,7 +333,7 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 		return result, nil
 	}
 
-	maxViewed, err := a.Srv().Store().Channel().GetReadReceiptMaxLastViewedAt(rctx, allowed, callerID)
+	maxSeen, err := a.Srv().Store().Channel().GetReadReceiptMaxSeenUpTo(rctx, allowed, callerID)
 	if err != nil {
 		return nil, model.NewAppError("GetPostsSeenStatus", "api.post.seen.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
@@ -343,8 +350,8 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 			result[post.Id] = false
 			continue
 		}
-		lastViewedAt, ok := maxViewed[post.ChannelId]
-		result[post.Id] = ok && lastViewedAt >= post.CreateAt
+		seenUpTo, ok := maxSeen[post.ChannelId]
+		result[post.Id] = ok && seenUpTo >= post.CreateAt
 	}
 
 	return result, nil
@@ -355,31 +362,37 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 type postSeenBatch struct {
 	viewer     *model.User
 	channelIDs []string
-	// prevLastViewedAt is the viewer's LastViewedAt per channel before the
-	// view; only posts created after it are newly seen.
-	prevLastViewedAt map[string]int64
-	// viewedUpTo is the channel LastPostAt the view moved LastViewedAt to;
-	// posts created later have not been seen.
-	viewedUpTo map[string]int64
+	// prevSeenUpTo is the viewer's seen pointer per channel before the view;
+	// only posts created after it are newly seen.
+	prevSeenUpTo map[string]int64
+	// seenUpTo is the value the view moved the seen pointer to; posts created
+	// later have not been seen.
+	seenUpTo map[string]int64
 }
 
-// preparePostSeenEvents runs before LastViewedAt is updated and returns nil
-// when the view must not produce post_seen events. Cheap in-memory checks
-// come first: the feature flag, the viewer, the session (only the viewer
-// marking their own channels as viewed counts, never an admin or plugin
-// acting on their behalf) and the per viewer rate limit. Only then does it
-// read the viewer's previous LastViewedAt for at most
-// readReceiptsMaxChannelsPerView channels. That read uses a replica: under
-// replica lag the previous value can be stale, so a post the viewer had
-// already seen may be announced once more (never one they have not seen,
-// since posts after the view are excluded). Marking a channel unread and
-// viewing it again legitimately announces the posts after the unread point.
-func (a *App) preparePostSeenEvents(rctx request.CTX, channelIDs []string, viewer *model.User) *postSeenBatch {
-	if !a.readReceiptsEnabled() || len(channelIDs) == 0 || viewer == nil || viewer.IsBot || viewer.DeleteAt != 0 {
+// advanceReadReceiptSeenUpTo is the only write path of the read receipt seen
+// pointer. It moves the viewer's pointer forward in channelIDs when the view
+// is the viewer's own (never an admin or plugin acting on their behalf, a
+// bot, a bot session or a deactivated user) and returns the post_seen work
+// for the channels whose pointer moved, or nil. The pointer is kept up to
+// date even while read receipts are disabled, so enabling them shows current
+// state; events are only prepared when enabled and the per viewer rate limit
+// allows, for at most readReceiptsMaxChannelsPerView channels.
+func (a *App) advanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, viewer *model.User) *postSeenBatch {
+	if len(channelIDs) == 0 || viewer == nil || viewer.IsBot || viewer.DeleteAt != 0 {
 		return nil
 	}
 	session := rctx.Session()
 	if session == nil || session.UserId != viewer.Id || session.IsBotUser() {
+		return nil
+	}
+
+	prev, seenUpTo, err := a.Srv().Store().Channel().AdvanceReadReceiptSeenUpTo(rctx, channelIDs, viewer.Id, model.GetMillis())
+	if err != nil {
+		rctx.Logger().Warn("Failed to advance read receipts seen pointer", mlog.String("user_id", viewer.Id), mlog.Err(err))
+		return nil
+	}
+	if len(seenUpTo) == 0 || !a.readReceiptsEnabled() {
 		return nil
 	}
 
@@ -392,39 +405,30 @@ func (a *App) preparePostSeenEvents(rctx request.CTX, channelIDs []string, viewe
 		return nil
 	}
 
-	if len(channelIDs) > readReceiptsMaxChannelsPerView {
-		channelIDs = channelIDs[:readReceiptsMaxChannelsPerView]
-	}
-	members, err := a.Srv().Store().Channel().GetMembersByChannelIds(channelIDs, viewer.Id)
-	if err != nil {
-		rctx.Logger().Warn("Failed to get channel members for read receipts", mlog.String("user_id", viewer.Id), mlog.Err(err))
-		return nil
-	}
-	prev := make(map[string]int64, len(members))
-	for _, member := range members {
-		if member.UserId == viewer.Id {
-			prev[member.ChannelId] = member.LastViewedAt
+	moved := make([]string, 0, readReceiptsMaxChannelsPerView)
+	for _, channelID := range channelIDs {
+		if len(moved) == readReceiptsMaxChannelsPerView {
+			break
 		}
-	}
-	if len(prev) == 0 {
-		return nil
+		if _, ok := seenUpTo[channelID]; ok && !slices.Contains(moved, channelID) {
+			moved = append(moved, channelID)
+		}
 	}
 
 	return &postSeenBatch{
-		viewer:           viewer,
-		channelIDs:       slices.Clone(channelIDs),
-		prevLastViewedAt: prev,
+		viewer:       viewer,
+		channelIDs:   moved,
+		prevSeenUpTo: prev,
+		seenUpTo:     seenUpTo,
 	}
 }
 
 // schedulePostSeenEvents publishes the events of batch off the request path,
 // so the seen-by work never delays or throttles the channel view itself.
-// viewedUpTo is the result of UpdateLastViewedAt.
-func (a *App) schedulePostSeenEvents(rctx request.CTX, batch *postSeenBatch, viewedUpTo map[string]int64) {
+func (a *App) schedulePostSeenEvents(rctx request.CTX, batch *postSeenBatch) {
 	if batch == nil {
 		return
 	}
-	batch.viewedUpTo = maps.Clone(viewedUpTo)
 	bgCtx := rctx.WithContext(context.WithoutCancel(rctx.Context()))
 	a.Srv().Go(func() {
 		for _, event := range a.postSeenEvents(bgCtx, batch) {
@@ -434,8 +438,8 @@ func (a *App) schedulePostSeenEvents(rctx request.CTX, batch *postSeenBatch, vie
 }
 
 // postSeenEvents builds the post_seen events for batch: one per newly seen
-// post (created after the viewer's previous LastViewedAt and at or before
-// the time the view moved it to), sent to the post author alone and carrying
+// post (created after the viewer's previous seen pointer and at or before
+// the value the view moved it to), sent to the post author alone and carrying
 // only {post_id, user_id}. It is bounded by readReceiptsMaxChannelsPerView,
 // readReceiptsMaxPostsPerView and a per (viewer, channel) rate limit.
 func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.WebSocketEvent {
@@ -450,12 +454,9 @@ func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.We
 
 	var events []*model.WebSocketEvent
 	for _, channelID := range batch.channelIDs {
-		prevViewedAt, ok := batch.prevLastViewedAt[channelID]
-		if !ok {
-			continue
-		}
-		viewedUpTo, ok := batch.viewedUpTo[channelID]
-		if !ok || viewedUpTo <= prevViewedAt {
+		prevSeenUpTo := batch.prevSeenUpTo[channelID]
+		seenUpTo, ok := batch.seenUpTo[channelID]
+		if !ok || seenUpTo <= prevSeenUpTo {
 			continue
 		}
 
@@ -498,7 +499,7 @@ func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.We
 
 		for _, postID := range postList.Order {
 			post := postList.Posts[postID]
-			if post == nil || post.CreateAt <= prevViewedAt || post.CreateAt > viewedUpTo {
+			if post == nil || post.CreateAt <= prevSeenUpTo || post.CreateAt > seenUpTo {
 				continue
 			}
 			if post.UserId == viewer.Id || post.DeleteAt != 0 || postHasNoReadReceipts(post) || !members[post.UserId] {

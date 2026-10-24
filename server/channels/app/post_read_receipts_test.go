@@ -36,14 +36,9 @@ func sessionFor(th *TestHelper, user *model.User) request.CTX {
 // synchronously and returns the events that would be published.
 func viewForPostSeen(t *testing.T, th *TestHelper, rctx request.CTX, viewer *model.User, channelIDs ...string) []*model.WebSocketEvent {
 	t.Helper()
-	batch := th.App.preparePostSeenEvents(rctx, channelIDs, viewer)
-	viewedUpTo, err := th.App.Srv().Store().Channel().UpdateLastViewedAt(channelIDs, viewer.Id)
+	_, err := th.App.Srv().Store().Channel().UpdateLastViewedAt(channelIDs, viewer.Id)
 	require.NoError(t, err)
-	if batch == nil {
-		return nil
-	}
-	batch.viewedUpTo = viewedUpTo
-	return th.App.postSeenEvents(rctx, batch)
+	return th.App.postSeenEvents(rctx, th.App.advanceReadReceiptSeenUpTo(rctx, channelIDs, viewer))
 }
 
 // newChannelPost creates a post by author with a server-assigned, strictly
@@ -166,20 +161,42 @@ func TestPostSeenEvents(t *testing.T) {
 		require.Empty(t, viewForPostSeen(t, th, sessionFor(th, viewer), viewer, channel.Id))
 	})
 
-	t.Run("marking viewed on behalf of the viewer emits nothing", func(t *testing.T) {
+	t.Run("marking viewed on behalf of the viewer emits nothing and does not count as seen", func(t *testing.T) {
 		viewer := th.CreateUser(t)
 		channel := newPostSeenChannel(t, th, viewer)
 		post := newChannelPost(t, th, author, channel)
 
 		require.Empty(t, viewForPostSeen(t, th, sessionFor(th, th.SystemAdminUser), viewer, channel.Id), "admin session")
 		require.Empty(t, viewForPostSeen(t, th, th.Context, viewer, channel.Id), "no session")
+		seenBy, appErr := th.App.GetPostSeenBy(sessionFor(th, author), post.Id, author.Id)
+		require.Nil(t, appErr)
+		require.Empty(t, seenBy)
 
-		// The view on behalf moved LastViewedAt, so the post is never
-		// announced later either.
+		// The view on behalf did not move the seen pointer, so the viewer's
+		// own view announces every post they have now seen.
 		later := newChannelPost(t, th, author, channel)
 		ids := seenPostIDs(viewForPostSeen(t, th, sessionFor(th, viewer), viewer, channel.Id))
-		require.Equal(t, []string{later.Id}, ids)
-		require.NotContains(t, ids, post.Id)
+		require.ElementsMatch(t, []string{post.Id, later.Id}, ids)
+	})
+
+	t.Run("mark as unread keeps the post seen and viewing again emits nothing", func(t *testing.T) {
+		viewer := th.CreateUser(t)
+		channel := newPostSeenChannel(t, th, viewer)
+		rctx := sessionFor(th, viewer)
+		post := newChannelPost(t, th, author, channel)
+		require.Equal(t, []string{post.Id}, seenPostIDs(viewForPostSeen(t, th, rctx, viewer, channel.Id)))
+
+		_, appErr := th.App.MarkChannelAsUnreadFromPost(rctx, post.Id, viewer.Id, false)
+		require.Nil(t, appErr)
+		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+		require.Nil(t, appErr)
+		require.Less(t, member.LastViewedAt, post.CreateAt)
+
+		seenBy, appErr := th.App.GetPostSeenBy(sessionFor(th, author), post.Id, author.Id)
+		require.Nil(t, appErr)
+		require.Equal(t, []string{viewer.Id}, seenBy)
+
+		require.Empty(t, viewForPostSeen(t, th, rctx, viewer, channel.Id))
 	})
 
 	t.Run("webhook, bot and system posts emit nothing", func(t *testing.T) {
@@ -203,14 +220,15 @@ func TestPostSeenEvents(t *testing.T) {
 		require.Empty(t, viewForPostSeen(t, th, sessionFor(th, viewer), viewer, channel.Id))
 	})
 
-	t.Run("per viewer rate limit suppresses emission before any query", func(t *testing.T) {
+	t.Run("per viewer rate limit suppresses emission", func(t *testing.T) {
 		viewer := th.CreateUser(t)
 		channel := newPostSeenChannel(t, th, viewer)
 		rctx := sessionFor(th, viewer)
 
 		prepared := 0
 		for range readReceiptsEmitViewerMaxBurst + 5 {
-			if th.App.preparePostSeenEvents(rctx, []string{channel.Id}, viewer) != nil {
+			newChannelPost(t, th, author, channel)
+			if th.App.advanceReadReceiptSeenUpTo(rctx, []string{channel.Id}, viewer) != nil {
 				prepared++
 			}
 		}
@@ -226,11 +244,8 @@ func TestPostSeenEvents(t *testing.T) {
 		rctx := sessionFor(th, viewer)
 		newChannelPost(t, th, author, channel)
 
-		batch := th.App.preparePostSeenEvents(rctx, []string{channel.Id}, viewer)
+		batch := th.App.advanceReadReceiptSeenUpTo(rctx, []string{channel.Id}, viewer)
 		require.NotNil(t, batch)
-		viewedUpTo, err := th.App.Srv().Store().Channel().UpdateLastViewedAt([]string{channel.Id}, viewer.Id)
-		require.NoError(t, err)
-		batch.viewedUpTo = viewedUpTo
 
 		emitted := 0
 		for range readReceiptsEmitMaxBurst + 5 {

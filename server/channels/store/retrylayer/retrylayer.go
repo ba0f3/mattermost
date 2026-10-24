@@ -1457,6 +1457,27 @@ func (s *RetryLayerBotStore) Update(bot *model.Bot) (*model.Bot, error) {
 
 }
 
+func (s *RetryLayerChannelStore) AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64, error) {
+
+	tries := 0
+	for {
+		result, resultVar1, err := s.ChannelStore.AdvanceReadReceiptSeenUpTo(rctx, channelIDs, userID, now)
+		if err == nil {
+			return result, resultVar1, nil
+		}
+		if !isRepeatableError(err) {
+			return result, resultVar1, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, resultVar1, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
 func (s *RetryLayerChannelStore) AnalyticsCountAll(teamID string) (map[model.ChannelType]int64, error) {
 
 	tries := 0
@@ -2987,11 +3008,11 @@ func (s *RetryLayerChannelStore) GetPublicChannelsForTeam(teamID string, offset 
 
 }
 
-func (s *RetryLayerChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+func (s *RetryLayerChannelStore) GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
 
 	tries := 0
 	for {
-		result, err := s.ChannelStore.GetReadReceiptMaxLastViewedAt(rctx, channelIDs, excludeUserID)
+		result, err := s.ChannelStore.GetReadReceiptMaxSeenUpTo(rctx, channelIDs, excludeUserID)
 		if err == nil {
 			return result, nil
 		}

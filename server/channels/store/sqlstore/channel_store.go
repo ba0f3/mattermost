@@ -12,6 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/lib/pq"
 	sq "github.com/mattermost/squirrel"
 	"github.com/pkg/errors"
 
@@ -1230,6 +1231,9 @@ func (s SqlChannelStore) PermanentDeleteMembersByChannel(rctx request.CTX, chann
 	_, err := s.GetMaster().Exec("DELETE FROM ChannelMembers WHERE ChannelId = ?", channelId)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete Channel with channelId=%s", channelId)
+	}
+	if _, err := s.GetMaster().Exec("DELETE FROM ChannelMemberSeen WHERE ChannelId = ?", channelId); err != nil {
+		return errors.Wrapf(err, "failed to delete ChannelMemberSeen with channelId=%s", channelId)
 	}
 
 	return nil
@@ -2549,38 +2553,40 @@ func (s SqlChannelStore) GetMembersWithLastViewedAtSince(rctx request.CTX, chann
 	return members, nil
 }
 
-// readReceiptEligibleMembersQuery selects from ChannelMembers joined so that
-// only active, non-bot members remain.
+// readReceiptEligibleMembersQuery selects from ChannelMembers joined with
+// ChannelMemberSeen so that only active, non-bot current members with a seen
+// pointer remain.
 func (s SqlChannelStore) readReceiptEligibleMembersQuery(columns ...string) sq.SelectBuilder {
 	return s.getQueryBuilder().
 		Select(columns...).
 		From("ChannelMembers").
+		InnerJoin("ChannelMemberSeen ON ChannelMemberSeen.ChannelId = ChannelMembers.ChannelId AND ChannelMemberSeen.UserId = ChannelMembers.UserId").
 		InnerJoin("Users ON Users.Id = ChannelMembers.UserId").
 		LeftJoin("Bots ON Bots.UserId = ChannelMembers.UserId").
 		Where(sq.Eq{"Users.DeleteAt": 0}).
 		Where(sq.Eq{"Bots.UserId": nil})
 }
 
-func (s SqlChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+func (s SqlChannelStore) GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
 	result := map[string]int64{}
 	if len(channelIDs) == 0 {
 		return result, nil
 	}
 
-	query := s.readReceiptEligibleMembersQuery("ChannelMembers.ChannelId", "MAX(ChannelMembers.LastViewedAt) AS LastViewedAt").
+	query := s.readReceiptEligibleMembersQuery("ChannelMembers.ChannelId", "MAX(ChannelMemberSeen.SeenUpTo) AS SeenUpTo").
 		Where(sq.Eq{"ChannelMembers.ChannelId": channelIDs}).
 		Where(sq.NotEq{"ChannelMembers.UserId": excludeUserID}).
 		GroupBy("ChannelMembers.ChannelId")
 
 	rows := []struct {
-		ChannelId    string
-		LastViewedAt int64
+		ChannelId string
+		SeenUpTo  int64
 	}{}
 	if err := s.DBXFromContext(rctx.Context()).SelectBuilder(&rows, query); err != nil {
-		return nil, errors.Wrap(err, "failed to get read receipt max last viewed at")
+		return nil, errors.Wrap(err, "failed to get read receipt max seen up to")
 	}
 	for _, row := range rows {
-		result[row.ChannelId] = row.LastViewedAt
+		result[row.ChannelId] = row.SeenUpTo
 	}
 
 	return result, nil
@@ -2593,7 +2599,7 @@ func (s SqlChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID strin
 
 	query := s.readReceiptEligibleMembersQuery("ChannelMembers.UserId").
 		Where(sq.Eq{"ChannelMembers.ChannelId": channelID}).
-		Where(sq.GtOrEq{"ChannelMembers.LastViewedAt": since}).
+		Where(sq.GtOrEq{"ChannelMemberSeen.SeenUpTo": since}).
 		Where(sq.NotEq{"ChannelMembers.UserId": excludeUserID}).
 		OrderBy("ChannelMembers.UserId ASC").
 		Limit(uint64(limit))
@@ -2604,6 +2610,59 @@ func (s SqlChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID strin
 	}
 
 	return userIDs, nil
+}
+
+func (s SqlChannelStore) AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64, error) {
+	prev := map[string]int64{}
+	seenUpTo := map[string]int64{}
+	if len(channelIDs) == 0 {
+		return prev, seenUpTo, nil
+	}
+
+	// The new value comes from the database only: the channel's LastPostAt,
+	// capped by now. All sub-statements see the same snapshot, so "old" holds
+	// the values from before the upsert. Rows the upsert leaves unchanged are
+	// not returned, which also keeps concurrent views from both reporting the
+	// same advance.
+	const query = `
+		WITH c AS (
+			SELECT Channels.Id AS ChannelId, LEAST(Channels.LastPostAt, ?) AS SeenUpTo
+			FROM Channels
+			INNER JOIN ChannelMembers ON ChannelMembers.ChannelId = Channels.Id AND ChannelMembers.UserId = ?
+			WHERE Channels.Id = ANY(?)
+		), old AS (
+			SELECT ChannelMemberSeen.ChannelId, ChannelMemberSeen.SeenUpTo
+			FROM ChannelMemberSeen
+			INNER JOIN c ON c.ChannelId = ChannelMemberSeen.ChannelId
+			WHERE ChannelMemberSeen.UserId = ?
+		), up AS (
+			INSERT INTO ChannelMemberSeen (ChannelId, UserId, SeenUpTo)
+			SELECT c.ChannelId, ?, c.SeenUpTo FROM c WHERE c.SeenUpTo > 0
+			ON CONFLICT (ChannelId, UserId) DO UPDATE
+				SET SeenUpTo = GREATEST(ChannelMemberSeen.SeenUpTo, EXCLUDED.SeenUpTo)
+				WHERE ChannelMemberSeen.SeenUpTo < EXCLUDED.SeenUpTo
+			RETURNING ChannelId, SeenUpTo
+		)
+		SELECT up.ChannelId, COALESCE(old.SeenUpTo, 0) AS PrevSeenUpTo, up.SeenUpTo
+		FROM up
+		LEFT JOIN old ON old.ChannelId = up.ChannelId`
+
+	rows := []struct {
+		ChannelId    string
+		PrevSeenUpTo int64
+		SeenUpTo     int64
+	}{}
+	if err := s.GetMaster().SelectContext(rctx.Context(), &rows, query, now, userID, pq.Array(channelIDs), userID, userID); err != nil {
+		return nil, nil, errors.Wrapf(err, "failed to advance read receipt seen pointer for userId=%s", userID)
+	}
+	for _, row := range rows {
+		if row.SeenUpTo > row.PrevSeenUpTo {
+			prev[row.ChannelId] = row.PrevSeenUpTo
+			seenUpTo[row.ChannelId] = row.SeenUpTo
+		}
+	}
+
+	return prev, seenUpTo, nil
 }
 
 func (s SqlChannelStore) InvalidateAllChannelMembersForUser(userId string) {
@@ -2964,6 +3023,9 @@ func (s SqlChannelStore) RemoveAllDeactivatedMembers(rctx request.CTX, channelId
 func (s SqlChannelStore) PermanentDeleteMembersByUser(rctx request.CTX, userId string) error {
 	if _, err := s.GetMaster().Exec("DELETE FROM ChannelMembers WHERE UserId = ?", userId); err != nil {
 		return errors.Wrapf(err, "failed to permanent delete ChannelMembers with userId=%s", userId)
+	}
+	if _, err := s.GetMaster().Exec("DELETE FROM ChannelMemberSeen WHERE UserId = ?", userId); err != nil {
+		return errors.Wrapf(err, "failed to permanent delete ChannelMemberSeen with userId=%s", userId)
 	}
 	return nil
 }

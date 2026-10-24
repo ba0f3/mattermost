@@ -3852,6 +3852,10 @@ func (a *App) MarkChannelsAsViewed(rctx request.CTX, channelIDs []string, userID
 		return nil, model.NewAppError("MarkChannelsAsViewed", "app.channel.get_channels_with_unreads_and_with_mentions.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
 
+	// The read receipt seen pointer may lag LastViewedAt (for example after a
+	// view on the user's behalf), so it is advanced for every viewed channel.
+	a.schedulePostSeenEvents(rctx, a.advanceReadReceiptSeenUpTo(rctx, channelIDs, user))
+
 	if len(channelsToView) == 0 {
 		return times, nil
 	}
@@ -3864,9 +3868,7 @@ func (a *App) MarkChannelsAsViewed(rctx request.CTX, channelIDs []string, userID
 		}
 	}
 
-	postSeen := a.preparePostSeenEvents(rctx, channelsToView, user)
-
-	viewedUpTo, err := a.Srv().Store().Channel().UpdateLastViewedAt(channelsToView, userID)
+	_, err = a.Srv().Store().Channel().UpdateLastViewedAt(channelsToView, userID)
 	if err != nil {
 		var invErr *store.ErrInvalidInput
 		switch {
@@ -3876,8 +3878,6 @@ func (a *App) MarkChannelsAsViewed(rctx request.CTX, channelIDs []string, userID
 			return nil, model.NewAppError("MarkChannelsAsViewed", "app.channel.update_last_viewed_at.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 		}
 	}
-
-	a.schedulePostSeenEvents(rctx, postSeen, viewedUpTo)
 
 	if *a.Config().ServiceSettings.EnableChannelViewedMessages {
 		message := model.NewWebSocketEvent(model.WebsocketEventMultipleChannelsViewed, "", "", userID, nil, "")

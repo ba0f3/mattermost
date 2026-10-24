@@ -264,15 +264,21 @@ type ChannelStore interface {
 	GetMemberLastViewedAt(rctx request.CTX, channelID string, userID string) (int64, error)
 	GetMembersWithLastViewedAtSince(rctx request.CTX, channelID string, since int64, afterUserID string, limit int) ([]*model.ChannelMemberLastViewed, error)
 	// GetReadReceiptUserIds returns, ordered by user ID, the IDs of current
-	// members of channelID whose LastViewedAt >= since, excluding excludeUserID,
-	// deactivated users, bots and users that opted out of read receipts. Only
-	// IDs are returned: callers must never expose LastViewedAt values.
+	// members of channelID whose read receipt seen pointer (ChannelMemberSeen,
+	// not LastViewedAt) is >= since, excluding excludeUserID, deactivated users
+	// and bots. Only IDs are returned: callers must never expose the pointer.
 	GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error)
-	// GetReadReceiptMaxLastViewedAt returns, per channel, the greatest
-	// LastViewedAt among the members eligible for GetReadReceiptUserIds
-	// (excluding excludeUserID). Channels without eligible members are absent.
-	// For server-side comparisons only: never expose the values.
-	GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error)
+	// GetReadReceiptMaxSeenUpTo returns, per channel, the greatest seen
+	// pointer among the members eligible for GetReadReceiptUserIds (excluding
+	// excludeUserID). Channels without eligible members are absent. For
+	// server-side comparisons only: never expose the values.
+	GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error)
+	// AdvanceReadReceiptSeenUpTo is the only write to the read receipt seen
+	// pointer. For each of channelIDs that userID is a member of, it raises
+	// the pointer to min(channel LastPostAt, now) and never lowers it. It
+	// returns the previous and new pointer of the channels whose pointer
+	// moved forward.
+	AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (prev map[string]int64, seenUpTo map[string]int64, err error)
 	GetChannelMembersTimezones(channelID string) ([]model.StringMap, error)
 	GetAllChannelMembersForUser(rctx request.CTX, userID string, allowFromCache bool, includeDeleted bool) (map[string]string, error)
 	GetChannelsMemberCount(channelIDs []string) (map[string]int64, error)
