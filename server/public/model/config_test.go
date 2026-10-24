@@ -4014,6 +4014,26 @@ func TestConfigExportSettingsIsValid(t *testing.T) {
 }
 
 func TestConfigServiceSettingsIsValid(t *testing.T) {
+	t.Run("read receipts settings", func(t *testing.T) {
+		cfg := Config{}
+		cfg.SetDefaults()
+		require.False(t, *cfg.ServiceSettings.EnableReadReceipts)
+		require.Equal(t, ServiceSettingsDefaultReadReceiptsMaxChannelMembers, *cfg.ServiceSettings.ReadReceiptsMaxChannelMembers)
+		require.Nil(t, cfg.ServiceSettings.isValid())
+
+		for _, invalid := range []int{0, -1, ServiceSettingsMaxReadReceiptsMaxChannelMembers + 1} {
+			*cfg.ServiceSettings.ReadReceiptsMaxChannelMembers = invalid
+			appErr := cfg.ServiceSettings.isValid()
+			require.NotNil(t, appErr)
+			require.Equal(t, "model.config.is_valid.read_receipts_max_channel_members.app_error", appErr.Id)
+		}
+
+		for _, valid := range []int{1, ServiceSettingsMaxReadReceiptsMaxChannelMembers} {
+			*cfg.ServiceSettings.ReadReceiptsMaxChannelMembers = valid
+			require.Nil(t, cfg.ServiceSettings.isValid())
+		}
+	})
+
 	t.Run("local socket file should exist if local mode enabled", func(t *testing.T) {
 		cfg := Config{}
 		cfg.SetDefaults()

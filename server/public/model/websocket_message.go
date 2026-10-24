@@ -107,6 +107,10 @@ const (
 	WebsocketEventPostRevealed                        WebsocketEventType = "post_revealed"
 	WebsocketEventPostBurned                          WebsocketEventType = "post_burned"
 	WebsocketEventBurnOnReadAllRevealed               WebsocketEventType = "burn_on_read_all_revealed"
+	// WebsocketEventPostSeen is sent only to a post's author when a member
+	// views the channel after the post was created. Payload: post_id and
+	// user_id (the viewer). It never carries timestamps.
+	WebsocketEventPostSeen WebsocketEventType = "post_seen"
 
 	WebsocketEventBoardCreated WebsocketEventType = "board_created"
 

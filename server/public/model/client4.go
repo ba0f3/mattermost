@@ -7965,6 +7965,28 @@ func (c *Client4) GetPostInfo(ctx context.Context, postId string) (*PostInfo, *R
 	return DecodeJSONFromResponse[*PostInfo](r)
 }
 
+// GetPostSeenBy returns the IDs of the users who have seen a post. Only the
+// post author may call it and read receipts must be enabled.
+func (c *Client4) GetPostSeenBy(ctx context.Context, postId string) (*PostSeenBy, *Response, error) {
+	r, err := c.doAPIGet(ctx, c.postRoute(postId).Join("seen"), "")
+	if err != nil {
+		return nil, BuildResponse(r), err
+	}
+	defer closeBody(r)
+	return DecodeJSONFromResponse[*PostSeenBy](r)
+}
+
+// GetPostsSeenStatus returns, for the caller's own posts among postIds,
+// whether each has been seen by at least one other eligible member.
+func (c *Client4) GetPostsSeenStatus(ctx context.Context, postIds []string) (*PostsSeenStatus, *Response, error) {
+	r, err := c.doAPIPostJSON(ctx, c.postsRoute().Join("seen_status"), PostsSeenStatusRequest{PostIds: postIds})
+	if err != nil {
+		return nil, BuildResponse(r), err
+	}
+	defer closeBody(r)
+	return DecodeJSONFromResponse[*PostsSeenStatus](r)
+}
+
 func (c *Client4) AcknowledgePost(ctx context.Context, postId, userId string) (*PostAcknowledgement, *Response, error) {
 	r, err := c.doAPIPost(ctx, c.userRoute(userId).Join(c.postRoute(postId), "ack"), "")
 	if err != nil {

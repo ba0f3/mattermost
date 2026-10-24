@@ -263,6 +263,16 @@ type ChannelStore interface {
 	GetMember(rctx request.CTX, channelID string, userID string) (*model.ChannelMember, error)
 	GetMemberLastViewedAt(rctx request.CTX, channelID string, userID string) (int64, error)
 	GetMembersWithLastViewedAtSince(rctx request.CTX, channelID string, since int64, afterUserID string, limit int) ([]*model.ChannelMemberLastViewed, error)
+	// GetReadReceiptUserIds returns, ordered by user ID, the IDs of current
+	// members of channelID whose LastViewedAt >= since, excluding excludeUserID,
+	// deactivated users, bots and users that opted out of read receipts. Only
+	// IDs are returned: callers must never expose LastViewedAt values.
+	GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error)
+	// GetReadReceiptMaxLastViewedAt returns, per channel, the greatest
+	// LastViewedAt among the members eligible for GetReadReceiptUserIds
+	// (excluding excludeUserID). Channels without eligible members are absent.
+	// For server-side comparisons only: never expose the values.
+	GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error)
 	GetChannelMembersTimezones(channelID string) ([]model.StringMap, error)
 	GetAllChannelMembersForUser(rctx request.CTX, userID string, allowFromCache bool, includeDeleted bool) (map[string]string, error)
 	GetChannelsMemberCount(channelIDs []string) (map[string]int64, error)

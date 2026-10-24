@@ -3875,6 +3875,8 @@ func (a *App) MarkChannelsAsViewed(rctx request.CTX, channelIDs []string, userID
 		}
 	}
 
+	a.schedulePostSeenEvents(rctx, channelsToView, user)
+
 	if *a.Config().ServiceSettings.EnableChannelViewedMessages {
 		message := model.NewWebSocketEvent(model.WebsocketEventMultipleChannelsViewed, "", "", userID, nil, "")
 		message.Add("channel_times", times)

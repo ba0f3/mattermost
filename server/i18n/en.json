@@ -4085,6 +4085,36 @@
     "description": "API error when the JSON body of a post (message) search request cannot be parsed."
   },
   {
+    "id": "api.post.seen.app_error",
+    "translation": "Unable to get read receipts.",
+    "description": "Generic server error returned when the server fails to compute who has seen a post (read receipts)."
+  },
+  {
+    "id": "api.post.seen.disabled.app_error",
+    "translation": "Read receipts are disabled.",
+    "description": "Error returned by the read receipts (seen by) endpoints when the EnableReadReceipts setting is off."
+  },
+  {
+    "id": "api.post.seen.not_found.app_error",
+    "translation": "Unable to find the post.",
+    "description": "Error returned by the read receipts endpoint when the post does not exist or the caller is not allowed to see its read receipts. Intentionally generic."
+  },
+  {
+    "id": "api.post.seen.opted_out.app_error",
+    "translation": "You have turned off read receipts, so you can't see who has seen your messages.",
+    "description": "Error returned to a user who opted out of read receipts when they ask who has seen their posts."
+  },
+  {
+    "id": "api.post.seen.out_of_scope.app_error",
+    "translation": "Read receipts are not available in this channel because it has too many members.",
+    "description": "Error returned when read receipts are requested for a post in a channel larger than the configured read receipts member limit."
+  },
+  {
+    "id": "api.post.seen_status.too_many_ids.app_error",
+    "translation": "Too many post IDs. The maximum is {{.Max}}.",
+    "description": "Error returned when the read receipts status request contains more post IDs than allowed."
+  },
+  {
     "id": "api.post.send_notification_and_forget.push_channel_mention",
     "translation": " notified the channel.",
     "description": "Mobile push notification body appended directly after the sender's name (note the leading space) when they use @channel/@all."
@@ -17455,6 +17485,11 @@
     "id": "model.config.is_valid.rate_sec.app_error",
     "translation": "Invalid per sec for rate limit settings. Must be a positive number.",
     "description": "Config validation error shown to system admins for the rate limiting queries-per-second setting; must be a positive number."
+  },
+  {
+    "id": "model.config.is_valid.read_receipts_max_channel_members.app_error",
+    "translation": "Invalid maximum channel members for read receipts. Must be between 1 and {{.Max}}.",
+    "description": "Config validation error shown to system admins for the setting limiting the channel size where read receipts are available."
   },
   {
     "id": "model.config.is_valid.read_timeout.app_error",
