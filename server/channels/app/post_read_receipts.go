@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"slices"
 
@@ -34,7 +35,17 @@ import (
 //   - bots, deactivated users, non-members, the author and users that opted
 //     out (preference read_receipts/opt_out = "true") are never listed;
 //   - opting out is two-way: an opted-out caller gets 403
-//     api.post.seen.opted_out.app_error and receives no post_seen events.
+//     api.post.seen.opted_out.app_error and receives no post_seen events;
+//   - bot sessions never get receipts: GET returns the not-found 404 and
+//     the batch endpoint returns an empty "seen" map, as if none of the
+//     posts were the caller's;
+//   - system messages and posts made by webhooks or bots (from_webhook /
+//     from_bot) have no receipts: GET returns the not-found 404 and the batch
+//     endpoint reports false;
+//   - post_seen events are only emitted when the session user marks their
+//     own channel as viewed (never when an admin or plugin does it on their
+//     behalf), and only for posts created after the viewer's previous
+//     LastViewedAt, so already seen posts never leak presence again.
 
 const (
 	// ReadReceiptsMaxSeenStatusPosts caps the post IDs accepted by
@@ -52,19 +63,22 @@ const (
 	// POST /posts/seen_status.
 	readReceiptsGetPerSec   = 5
 	readReceiptsGetMaxBurst = 30
-	// post_seen emission rate limit, per (viewer, channel): sustained one
-	// emission round every 5 seconds with a small burst. Throttled rounds are
-	// dropped (clients can always refetch the list); the channel view itself is
-	// never throttled.
-	readReceiptsEmitPerMin   = 12
-	readReceiptsEmitMaxBurst = 2
+	// post_seen emission rate limits. The per viewer limit is checked first,
+	// before any database work; the per (viewer, channel) limit is a second
+	// layer. Throttled rounds are dropped (clients can always refetch the
+	// list); the channel view itself is never throttled.
+	readReceiptsEmitViewerPerMin   = 30
+	readReceiptsEmitViewerMaxBurst = 10
+	readReceiptsEmitPerMin         = 12
+	readReceiptsEmitMaxBurst       = 2
 
 	readReceiptsLimiterStoreSize = 20000
 )
 
 type readReceiptsLimiters struct {
-	get  *RateLimiter
-	emit *throttled.GCRARateLimiterCtx
+	get        *RateLimiter
+	emitViewer *throttled.GCRARateLimiterCtx
+	emit       *throttled.GCRARateLimiterCtx
 }
 
 // ReadReceiptsRateLimiter returns the per-user rate limiter guarding
@@ -93,16 +107,23 @@ func (s *Server) readReceiptsLimiters() *readReceiptsLimiters {
 		}
 		limiters.get = getLimiter
 
-		emitStore, err := memstore.NewCtx(readReceiptsLimiterStoreSize)
-		if err == nil {
-			limiters.emit, err = throttled.NewGCRARateLimiterCtx(emitStore, throttled.RateQuota{
-				MaxRate:  throttled.PerMin(readReceiptsEmitPerMin),
-				MaxBurst: readReceiptsEmitMaxBurst,
-			})
+		newEmitLimiter := func(perMin, burst int) *throttled.GCRARateLimiterCtx {
+			emitStore, err := memstore.NewCtx(readReceiptsLimiterStoreSize)
+			var limiter *throttled.GCRARateLimiterCtx
+			if err == nil {
+				limiter, err = throttled.NewGCRARateLimiterCtx(emitStore, throttled.RateQuota{
+					MaxRate:  throttled.PerMin(perMin),
+					MaxBurst: burst,
+				})
+			}
+			if err != nil {
+				s.Log().Error("Failed to create read receipts emission rate limiter", mlog.Err(err))
+				return nil
+			}
+			return limiter
 		}
-		if err != nil {
-			s.Log().Error("Failed to create read receipts emission rate limiter", mlog.Err(err))
-		}
+		limiters.emitViewer = newEmitLimiter(readReceiptsEmitViewerPerMin, readReceiptsEmitViewerMaxBurst)
+		limiters.emit = newEmitLimiter(readReceiptsEmitPerMin, readReceiptsEmitMaxBurst)
 
 		s.readReceipts = limiters
 	})
@@ -116,17 +137,38 @@ func (a *App) readReceiptsEnabled() bool {
 // readReceiptsChannelInScope reports whether read receipts apply to channel:
 // DMs and GMs always, other message channels only up to the configured size.
 func (a *App) readReceiptsChannelInScope(rctx request.CTX, channel *model.Channel) (bool, *model.AppError) {
-	if channel.IsGroupOrDirect() {
-		return true, nil
-	}
-	if !channel.IsMessageChannel() {
-		return false, nil
+	if !readReceiptsNeedsMemberCount(channel) {
+		return channel.IsGroupOrDirect(), nil
 	}
 	count, appErr := a.GetChannelMemberCount(rctx, channel.Id)
 	if appErr != nil {
 		return false, appErr
 	}
-	return count <= int64(*a.Config().ServiceSettings.ReadReceiptsMaxChannelMembers), nil
+	return a.readReceiptsMemberCountInScope(count), nil
+}
+
+// readReceiptsNeedsMemberCount reports whether the scope of channel depends on
+// its member count (message channels other than DMs and GMs).
+func readReceiptsNeedsMemberCount(channel *model.Channel) bool {
+	return !channel.IsGroupOrDirect() && channel.IsMessageChannel()
+}
+
+func (a *App) readReceiptsMemberCountInScope(count int64) bool {
+	return count <= int64(*a.Config().ServiceSettings.ReadReceiptsMaxChannelMembers)
+}
+
+// postHasNoReadReceipts reports whether post is excluded from read receipts:
+// system messages and posts made by webhooks or bots.
+func postHasNoReadReceipts(post *model.Post) bool {
+	// Same presence test CreatePost uses for these props.
+	return post.IsSystemMessage() ||
+		post.GetProp(model.PostPropsFromWebhook) != nil ||
+		post.GetProp(model.PostPropsFromBot) != nil
+}
+
+func isBotSession(rctx request.CTX) bool {
+	session := rctx.Session()
+	return session != nil && session.IsBotUser()
 }
 
 func (a *App) userOptedOutOfReadReceipts(userID string) (bool, error) {
@@ -165,6 +207,10 @@ func (a *App) GetPostSeenBy(rctx request.CTX, postID, callerID string) ([]string
 		return model.NewAppError("GetPostSeenBy", "api.post.seen.not_found.app_error", nil, "", http.StatusNotFound)
 	}
 
+	if isBotSession(rctx) {
+		return nil, notFound()
+	}
+
 	post, err := a.Srv().Store().Post().GetSingle(rctx, postID, false)
 	if err != nil {
 		if isNotFoundError(err) {
@@ -173,7 +219,7 @@ func (a *App) GetPostSeenBy(rctx request.CTX, postID, callerID string) ([]string
 		return nil, model.NewAppError("GetPostSeenBy", "api.post.seen.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
 
-	if post.UserId != callerID {
+	if post.UserId != callerID || postHasNoReadReceipts(post) {
 		return nil, notFound()
 	}
 
@@ -214,15 +260,22 @@ func (a *App) GetPostSeenBy(rctx request.CTX, postID, callerID string) ([]string
 // GetPostSeenBy). Posts that are missing, deleted, not authored by the caller,
 // in channels the caller is no longer a member of, or in channels out of scope
 // are silently omitted, so the response never distinguishes those cases.
+// Queryable system, webhook and bot posts are always reported as false. A bot
+// session gets an empty result, as if it had authored none of the posts.
 func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID string) (map[string]bool, *model.AppError) {
 	if !a.readReceiptsEnabled() {
 		return nil, model.NewAppError("GetPostsSeenStatus", "api.post.seen.disabled.app_error", nil, "", http.StatusNotImplemented)
 	}
+
+	result := map[string]bool{}
+	if isBotSession(rctx) {
+		return result, nil
+	}
+
 	if appErr := a.checkReadReceiptsCallerNotOptedOut(callerID); appErr != nil {
 		return nil, appErr
 	}
 
-	result := map[string]bool{}
 	if len(postIDs) == 0 {
 		return result, nil
 	}
@@ -264,15 +317,34 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 		channelByID[channel.Id] = channel
 	}
 
-	allowed := make([]string, 0, len(memberships))
+	memberChannels := make([]*model.Channel, 0, len(memberships))
+	countIDs := []string{}
 	for _, membership := range memberships {
 		channel := channelByID[membership.ChannelId]
 		if channel == nil || membership.UserId != callerID {
 			continue
 		}
-		inScope, appErr := a.readReceiptsChannelInScope(rctx, channel)
-		if appErr != nil {
-			return nil, appErr
+		memberChannels = append(memberChannels, channel)
+		if readReceiptsNeedsMemberCount(channel) {
+			countIDs = append(countIDs, channel.Id)
+		}
+	}
+
+	// One query for the member counts of all channels whose scope depends on it.
+	counts := map[string]int64{}
+	if len(countIDs) > 0 {
+		counts, err = a.Srv().Store().Channel().GetChannelsMemberCount(countIDs)
+		if err != nil {
+			return nil, model.NewAppError("GetPostsSeenStatus", "api.post.seen.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
+		}
+	}
+
+	allowed := make([]string, 0, len(memberChannels))
+	for _, channel := range memberChannels {
+		inScope := channel.IsGroupOrDirect()
+		if readReceiptsNeedsMemberCount(channel) {
+			count, ok := counts[channel.Id]
+			inScope = ok && a.readReceiptsMemberCountInScope(count)
 		}
 		if inScope {
 			allowed = append(allowed, channel.Id)
@@ -295,6 +367,10 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 		if !allowedSet[post.ChannelId] {
 			continue
 		}
+		if postHasNoReadReceipts(post) {
+			result[post.Id] = false
+			continue
+		}
 		lastViewedAt, ok := maxViewed[post.ChannelId]
 		result[post.Id] = ok && lastViewedAt >= post.CreateAt
 	}
@@ -302,59 +378,136 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 	return result, nil
 }
 
-// schedulePostSeenEvents runs publishPostSeenEvents off the request path, so
-// the seen-by work never delays or throttles the channel view itself.
-func (a *App) schedulePostSeenEvents(rctx request.CTX, channelIDs []string, viewer *model.User) {
-	if !a.readReceiptsEnabled() || len(channelIDs) == 0 {
-		return
-	}
-	channelIDs = slices.Clone(channelIDs)
-	bgCtx := rctx.WithContext(context.WithoutCancel(rctx.Context()))
-	a.Srv().Go(func() {
-		a.publishPostSeenEvents(bgCtx, channelIDs, viewer)
-	})
+// postSeenBatch is the work for one mark-as-viewed call that may produce
+// post_seen events.
+type postSeenBatch struct {
+	viewer     *model.User
+	channelIDs []string
+	// prevLastViewedAt is the viewer's LastViewedAt per channel before the
+	// view; only posts created after it are newly seen.
+	prevLastViewedAt map[string]int64
+	// viewedUpTo is the channel LastPostAt the view moved LastViewedAt to;
+	// posts created later have not been seen.
+	viewedUpTo map[string]int64
 }
 
-// publishPostSeenEvents notifies the authors of the most recent posts in the
-// viewed channels that viewer has now seen them. Each post_seen event carries
-// only {post_id, user_id} and is sent to the post author alone. It is meant to
-// run asynchronously after a successful mark-as-viewed and is bounded by
-// readReceiptsMaxChannelsPerView, readReceiptsMaxPostsPerView and a per
-// (viewer, channel) emission rate limit.
-func (a *App) publishPostSeenEvents(rctx request.CTX, channelIDs []string, viewer *model.User) {
-	if !a.readReceiptsEnabled() || viewer.IsBot || viewer.DeleteAt != 0 {
-		return
+// preparePostSeenEvents runs before LastViewedAt is updated and returns nil
+// when the view must not produce post_seen events. Cheap in-memory checks
+// come first: the feature flag, the viewer, the session (only the viewer
+// marking their own channels as viewed counts, never an admin or plugin
+// acting on their behalf) and the per viewer rate limit. Only then does it
+// read the viewer's previous LastViewedAt for at most
+// readReceiptsMaxChannelsPerView channels. That read uses a replica: under
+// replica lag the previous value can be stale, so a post the viewer had
+// already seen may be announced once more (never one they have not seen,
+// since posts after the view are excluded). Marking a channel unread and
+// viewing it again legitimately announces the posts after the unread point.
+func (a *App) preparePostSeenEvents(rctx request.CTX, channelIDs []string, viewer *model.User) *postSeenBatch {
+	if !a.readReceiptsEnabled() || len(channelIDs) == 0 || viewer == nil || viewer.IsBot || viewer.DeleteAt != 0 {
+		return nil
 	}
-	optedOut, err := a.userOptedOutOfReadReceipts(viewer.Id)
-	if err != nil {
-		rctx.Logger().Warn("Failed to read read receipts preference", mlog.String("user_id", viewer.Id), mlog.Err(err))
-		return
-	}
-	if optedOut {
-		return
+	session := rctx.Session()
+	if session == nil || session.UserId != viewer.Id || session.IsBotUser() {
+		return nil
 	}
 
-	limiter := a.Srv().readReceiptsLimiters().emit
-	if limiter == nil {
-		return
+	limiters := a.Srv().readReceiptsLimiters()
+	if limiters.emitViewer == nil || limiters.emit == nil {
+		return nil
+	}
+	limited, _, err := limiters.emitViewer.RateLimitCtx(rctx.Context(), viewer.Id, 1)
+	if err != nil || limited {
+		return nil
 	}
 
 	if len(channelIDs) > readReceiptsMaxChannelsPerView {
 		channelIDs = channelIDs[:readReceiptsMaxChannelsPerView]
 	}
+	members, err := a.Srv().Store().Channel().GetMembersByChannelIds(channelIDs, viewer.Id)
+	if err != nil {
+		rctx.Logger().Warn("Failed to get channel members for read receipts", mlog.String("user_id", viewer.Id), mlog.Err(err))
+		return nil
+	}
+	prev := make(map[string]int64, len(members))
+	for _, member := range members {
+		if member.UserId == viewer.Id {
+			prev[member.ChannelId] = member.LastViewedAt
+		}
+	}
+	if len(prev) == 0 {
+		return nil
+	}
 
-	for _, channelID := range channelIDs {
+	return &postSeenBatch{
+		viewer:           viewer,
+		channelIDs:       slices.Clone(channelIDs),
+		prevLastViewedAt: prev,
+	}
+}
+
+// schedulePostSeenEvents publishes the events of batch off the request path,
+// so the seen-by work never delays or throttles the channel view itself.
+// viewedUpTo is the result of UpdateLastViewedAt.
+func (a *App) schedulePostSeenEvents(rctx request.CTX, batch *postSeenBatch, viewedUpTo map[string]int64) {
+	if batch == nil {
+		return
+	}
+	batch.viewedUpTo = maps.Clone(viewedUpTo)
+	bgCtx := rctx.WithContext(context.WithoutCancel(rctx.Context()))
+	a.Srv().Go(func() {
+		for _, event := range a.postSeenEvents(bgCtx, batch) {
+			a.Publish(event)
+		}
+	})
+}
+
+// postSeenEvents builds the post_seen events for batch: one per newly seen
+// post (created after the viewer's previous LastViewedAt and at or before
+// the time the view moved it to), sent to the post author alone and carrying
+// only {post_id, user_id}. It is bounded by readReceiptsMaxChannelsPerView,
+// readReceiptsMaxPostsPerView and a per (viewer, channel) rate limit.
+func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.WebSocketEvent {
+	if batch == nil || !a.readReceiptsEnabled() {
+		return nil
+	}
+	viewer := batch.viewer
+	limiter := a.Srv().readReceiptsLimiters().emit
+	if limiter == nil {
+		return nil
+	}
+
+	optedOut, err := a.userOptedOutOfReadReceipts(viewer.Id)
+	if err != nil {
+		rctx.Logger().Warn("Failed to read read receipts preference", mlog.String("user_id", viewer.Id), mlog.Err(err))
+		return nil
+	}
+	if optedOut {
+		return nil
+	}
+
+	var events []*model.WebSocketEvent
+	authorOptedOut := map[string]bool{}
+	for _, channelID := range batch.channelIDs {
+		prevViewedAt, ok := batch.prevLastViewedAt[channelID]
+		if !ok {
+			continue
+		}
+		viewedUpTo, ok := batch.viewedUpTo[channelID]
+		if !ok || viewedUpTo <= prevViewedAt {
+			continue
+		}
+
+		limited, _, err := limiter.RateLimitCtx(rctx.Context(), viewer.Id+":"+channelID, 1)
+		if err != nil || limited {
+			continue
+		}
+
 		channel, appErr := a.GetChannel(rctx, channelID)
 		if appErr != nil {
 			continue
 		}
 		inScope, appErr := a.readReceiptsChannelInScope(rctx, channel)
 		if appErr != nil || !inScope {
-			continue
-		}
-
-		limited, _, err := limiter.RateLimitCtx(rctx.Context(), viewer.Id+":"+channelID, 1)
-		if err != nil || limited {
 			continue
 		}
 
@@ -381,10 +534,12 @@ func (a *App) publishPostSeenEvents(rctx request.CTX, channelIDs []string, viewe
 			members[id] = true
 		}
 
-		authorOptedOut := map[string]bool{}
 		for _, postID := range postList.Order {
 			post := postList.Posts[postID]
-			if post == nil || post.UserId == viewer.Id || post.DeleteAt != 0 || post.IsSystemMessage() || !members[post.UserId] {
+			if post == nil || post.CreateAt <= prevViewedAt || post.CreateAt > viewedUpTo {
+				continue
+			}
+			if post.UserId == viewer.Id || post.DeleteAt != 0 || postHasNoReadReceipts(post) || !members[post.UserId] {
 				continue
 			}
 			// Opt-out is two-way: opted-out authors get no seen events.
@@ -401,7 +556,8 @@ func (a *App) publishPostSeenEvents(rctx request.CTX, channelIDs []string, viewe
 			message := model.NewWebSocketEvent(model.WebsocketEventPostSeen, "", "", post.UserId, nil, "")
 			message.Add("post_id", post.Id)
 			message.Add("user_id", viewer.Id)
-			a.Publish(message)
+			events = append(events, message)
 		}
 	}
+	return events
 }

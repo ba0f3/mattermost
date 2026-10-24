@@ -463,3 +463,159 @@ func TestPostSeenWebSocketEvent(t *testing.T) {
 		noPostSeen("author (opted out)", authorWS)
 	})
 }
+
+func TestPostSeenWebSocketEventOnBehalf(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := setupReadReceipts(t)
+	ctx := context.Background()
+
+	viewer := th.BasicUser2
+	channel := th.CreatePublicChannel(t)
+	th.AddUserToChannel(t, viewer, channel)
+	viewerClient := loggedInClient(t, th, viewer)
+	authorWS := th.CreateConnectedWebSocketClient(t)
+
+	// An admin marking the channel read for the viewer emits nothing...
+	onBehalf := th.CreatePostWithClient(t, th.Client, channel)
+	_, _, err := th.SystemAdminClient.ReadMultipleChannels(ctx, viewer.Id, []string{channel.Id})
+	require.NoError(t, err)
+
+	// ...and since LastViewedAt moved, the viewer's own later view only
+	// announces posts created after it.
+	later := th.CreatePostWithClient(t, th.Client, channel)
+	_, _, err = viewerClient.ViewChannel(ctx, viewer.Id, &model.ChannelView{ChannelId: channel.Id})
+	require.NoError(t, err)
+
+	// Events of one view are published together, newest post first, so keep
+	// reading for a while after the expected one arrives.
+	timeout := time.After(10 * time.Second)
+	var drain <-chan time.Time
+	gotLater := false
+	for {
+		select {
+		case event := <-authorWS.EventChannel:
+			if event.EventType() != model.WebsocketEventPostSeen {
+				continue
+			}
+			require.NotEqual(t, onBehalf.Id, event.GetData()["post_id"], "post marked read on behalf of the viewer must not be announced")
+			if event.GetData()["post_id"] == later.Id && !gotLater {
+				gotLater = true
+				drain = time.After(2 * time.Second)
+			}
+		case <-drain:
+			return
+		case <-timeout:
+			require.FailNow(t, "author did not receive post_seen for the viewer's own view")
+		}
+	}
+}
+
+func TestGetPostSeenByBotCaller(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := setupReadReceipts(t)
+	ctx := context.Background()
+
+	th.App.UpdateConfig(func(cfg *model.Config) {
+		cfg.ServiceSettings.EnableBotAccountCreation = new(true)
+		cfg.ServiceSettings.EnableUserAccessTokens = new(true)
+	})
+	bot := th.CreateBotWithSystemAdminClient(t)
+	botUser, appErr := th.App.GetUser(th.Context, bot.UserId)
+	require.Nil(t, appErr)
+	th.LinkUserToTeam(t, botUser, th.BasicTeam)
+	th.AddUserToChannel(t, botUser, th.BasicChannel)
+	token, appErr := th.App.CreateUserAccessToken(th.Context, &model.UserAccessToken{UserId: bot.UserId, Description: "read receipts bot"})
+	require.Nil(t, appErr)
+	botClient := th.CreateClient()
+	botClient.SetToken(token.Token)
+
+	botPost := th.CreatePostWithClient(t, botClient, th.BasicChannel)
+	readReceiptsView(t, th, th.BasicUser.Id, th.BasicChannel.Id)
+
+	_, resp, err := botClient.GetPostSeenBy(ctx, botPost.Id)
+	CheckNotFoundStatus(t, resp)
+	own := requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+
+	_, resp, err = botClient.GetPostSeenBy(ctx, model.NewId())
+	CheckNotFoundStatus(t, resp)
+	missing := requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+	require.Equal(t, missing.Message, own.Message)
+	require.Equal(t, missing.DetailedError, own.DetailedError)
+	require.Equal(t, missing.Where, own.Where)
+
+	status, _, err := botClient.GetPostsSeenStatus(ctx, []string{botPost.Id})
+	require.NoError(t, err)
+	require.NotNil(t, status.Seen)
+	require.Empty(t, status.Seen)
+}
+
+func TestGetPostSeenByReceiptlessPosts(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := setupReadReceipts(t)
+	ctx := context.Background()
+
+	channel := th.BasicChannel
+	webhookPost, _, appErr := th.App.CreatePost(th.Context, &model.Post{
+		UserId:    th.BasicUser.Id,
+		ChannelId: channel.Id,
+		Message:   "from a webhook",
+	}, channel, model.CreatePostFlags{FromIncomingWebhook: true})
+	require.Nil(t, appErr)
+	require.Equal(t, "true", webhookPost.GetProp(model.PostPropsFromWebhook))
+
+	systemPost, err := th.App.Srv().Store().Post().Save(th.Context, &model.Post{
+		UserId:    th.BasicUser.Id,
+		ChannelId: channel.Id,
+		Type:      model.PostTypeHeaderChange,
+		Message:   "header changed",
+	})
+	require.NoError(t, err)
+	regular := th.CreatePostWithClient(t, th.Client, channel)
+	readReceiptsView(t, th, th.BasicUser2.Id, channel.Id)
+
+	_, resp, err := th.Client.GetPostSeenBy(ctx, model.NewId())
+	CheckNotFoundStatus(t, resp)
+	missing := requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+
+	for name, post := range map[string]*model.Post{"webhook": webhookPost, "system": systemPost} {
+		_, resp, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		CheckNotFoundStatus(t, resp)
+		got := requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+		require.Equal(t, missing.Message, got.Message, name)
+		require.Equal(t, missing.DetailedError, got.DetailedError, name)
+		require.Equal(t, missing.Where, got.Where, name)
+	}
+
+	seen, _, err := th.Client.GetPostSeenBy(ctx, regular.Id)
+	require.NoError(t, err)
+	require.Equal(t, []string{th.BasicUser2.Id}, seen.UserIds)
+
+	status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{webhookPost.Id, systemPost.Id, regular.Id})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{webhookPost.Id: false, systemPost.Id: false, regular.Id: true}, status.Seen)
+}
+
+func TestGetPostsSeenStatusDeletedPost(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := setupReadReceipts(t)
+	ctx := context.Background()
+
+	deleted := th.CreatePostWithClient(t, th.Client, th.BasicChannel)
+	kept := th.CreatePostWithClient(t, th.Client, th.BasicChannel)
+	readReceiptsView(t, th, th.BasicUser2.Id, th.BasicChannel.Id)
+
+	status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{deleted.Id, kept.Id})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{deleted.Id: true, kept.Id: true}, status.Seen)
+
+	_, err = th.Client.DeletePost(ctx, deleted.Id)
+	require.NoError(t, err)
+
+	status, _, err = th.Client.GetPostsSeenStatus(ctx, []string{deleted.Id, kept.Id})
+	require.NoError(t, err)
+	require.Equal(t, map[string]bool{kept.Id: true}, status.Seen)
+
+	_, resp, err := th.Client.GetPostSeenBy(ctx, deleted.Id)
+	CheckNotFoundStatus(t, resp)
+	requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+}
