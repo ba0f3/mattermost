@@ -1003,3 +1003,20 @@ func TestGetLimitedClientConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateClientConfigPostAcknowledgements(t *testing.T) {
+	cfg := &model.Config{}
+	cfg.SetDefaults()
+
+	t.Run("enabled with post priority and no license", func(t *testing.T) {
+		*cfg.ServiceSettings.PostPriority = true
+		props := GenerateClientConfig(cfg, "", nil)
+		assert.Equal(t, "true", props["PostAcknowledgements"])
+	})
+
+	t.Run("disabled without post priority", func(t *testing.T) {
+		*cfg.ServiceSettings.PostPriority = false
+		props := GenerateClientConfig(cfg, "", nil)
+		assert.Equal(t, "false", props["PostAcknowledgements"])
+	})
+}

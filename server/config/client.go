@@ -147,6 +147,7 @@ func GenerateClientConfig(c *model.Config, telemetryID string, license *model.Li
 	props["CollapsedThreads"] = *c.ServiceSettings.CollapsedThreads
 	props["EnableCustomGroups"] = "false"
 	props["PostPriority"] = strconv.FormatBool(*c.ServiceSettings.PostPriority)
+	props["PostAcknowledgements"] = strconv.FormatBool(*c.ServiceSettings.PostPriority)
 	props["AllowPersistentNotifications"] = strconv.FormatBool(*c.ServiceSettings.AllowPersistentNotifications)
 	props["AllowPersistentNotificationsForGuests"] = strconv.FormatBool(*c.ServiceSettings.AllowPersistentNotificationsForGuests)
 	props["PersistentNotificationMaxCount"] = strconv.FormatInt(int64(*c.ServiceSettings.PersistentNotificationMaxCount), 10)
@@ -237,7 +238,6 @@ func GenerateClientConfig(c *model.Config, telemetryID string, license *model.Li
 
 		if model.MinimumProfessionalLicense(license) {
 			props["EnableCustomGroups"] = strconv.FormatBool(*c.ServiceSettings.EnableCustomGroups)
-			props["PostAcknowledgements"] = "true"
 			props["ScheduledPosts"] = strconv.FormatBool(*c.ServiceSettings.ScheduledPosts)
 		}
 
