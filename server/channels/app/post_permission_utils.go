@@ -54,12 +54,6 @@ func postPriorityCheck(
 		return model.NewAppError("", "api.post.post_priority.priority_post_only_allowed_for_root_post.request_error", nil, "", http.StatusBadRequest)
 	}
 
-	if ack := priority.RequestedAck; ack != nil && *ack {
-		if !model.MinimumProfessionalLicense(license) {
-			return model.NewAppError("", "license_error.feature_unavailable", nil, "feature is not available for the current license", http.StatusNotImplemented)
-		}
-	}
-
 	if notification := priority.PersistentNotifications; notification != nil && *notification {
 		if !model.MinimumProfessionalLicense(license) {
 			return model.NewAppError("", "license_error.feature_unavailable", nil, "feature is not available for the current license", http.StatusNotImplemented)

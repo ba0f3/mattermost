@@ -1472,12 +1472,6 @@ func unpinPost(c *Context, w http.ResponseWriter, _ *http.Request) {
 }
 
 func acknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
-	// license check
-	if !model.MinimumProfessionalLicense(c.App.Srv().License()) {
-		c.Err = model.NewAppError("", model.NoTranslation, nil, "feature is not available for the current license", http.StatusNotImplemented)
-		return
-	}
-
 	c.RequirePostId().RequireUserId()
 	if c.Err != nil {
 		return
@@ -1490,6 +1484,37 @@ func acknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	if ok, _ := c.App.SessionHasPermissionToReadPost(c.AppContext, *c.AppContext.Session(), c.Params.PostId); !ok {
 		c.SetPermissionError(model.PermissionReadChannelContent)
+		return
+	}
+
+	post, appErr := c.App.GetSinglePost(c.AppContext, c.Params.PostId, false)
+	if appErr != nil {
+		c.Err = appErr
+		return
+	}
+
+	// Only current channel members may acknowledge. Reading a public channel
+	// does not require membership, so check it explicitly.
+	if _, appErr = c.App.GetChannelMember(c.AppContext, post.ChannelId, c.Params.UserId); appErr != nil {
+		if appErr.StatusCode == http.StatusNotFound {
+			c.SetPermissionError(model.PermissionReadChannelContent)
+			return
+		}
+		c.Err = appErr
+		return
+	}
+
+	if !c.App.IsPostPriorityEnabled() {
+		c.Err = model.NewAppError("acknowledgePost", "api.acknowledgement.save.not_requested.app_error", nil, "post priority is disabled", http.StatusBadRequest)
+		return
+	}
+	priority, appErr := c.App.GetPriorityForPost(post.Id)
+	if appErr != nil {
+		c.Err = appErr
+		return
+	}
+	if priority == nil || priority.RequestedAck == nil || !*priority.RequestedAck {
+		c.Err = model.NewAppError("acknowledgePost", "api.acknowledgement.save.not_requested.app_error", nil, "post did not request acknowledgements", http.StatusBadRequest)
 		return
 	}
 
@@ -1511,12 +1536,6 @@ func acknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func unacknowledgePost(c *Context, w http.ResponseWriter, r *http.Request) {
-	// license check
-	if !model.MinimumProfessionalLicense(c.App.Srv().License()) {
-		c.Err = model.NewAppError("", "license_error.feature_unavailable", nil, "feature is not available for the current license", http.StatusNotImplemented)
-		return
-	}
-
 	c.RequirePostId().RequireUserId()
 	if c.Err != nil {
 		return
