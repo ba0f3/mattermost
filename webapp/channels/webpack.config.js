@@ -27,6 +27,7 @@ const targetIsDevServer = NPM_TARGET?.startsWith('dev-server');
 const targetIsEsLint = !targetIsBuild && !targetIsRun && !targetIsDevServer;
 
 const DEV = targetIsRun || targetIsStats || targetIsDevServer;
+const sharedSource = path.resolve(__dirname, '../platform/shared/src');
 
 const STANDARD_EXCLUDE = [
     /node_modules/,
@@ -60,13 +61,25 @@ var config = {
         rules: [
             {
                 test: /\.(js|jsx|ts|tsx)$/,
-                exclude: STANDARD_EXCLUDE,
+                exclude: [...STANDARD_EXCLUDE, sharedSource],
                 use: {
                     loader: 'babel-loader',
                     options: {
                         cacheDirectory: true,
 
                         // Babel configuration is in .babelrc because jest requires it to be there.
+                    },
+                },
+            },
+            {
+                test: /\.(js|jsx|ts|tsx)$/,
+                include: sharedSource,
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        cacheDirectory: true,
+                        configFile: path.resolve(__dirname, 'babel.config.js'),
+                        presets: [['@babel/preset-react', {runtime: 'automatic', development: DEV}]],
                     },
                 },
             },
@@ -127,6 +140,10 @@ var config = {
             'mattermost-redux/test': 'packages/mattermost-redux/test',
             'mattermost-redux': 'packages/mattermost-redux/src',
             '@mui/styled-engine': '@mui/styled-engine-sc',
+
+            // Parcel watch writes development JSX to shared/dist. Compile from
+            // source so the app always uses JSX matching its own build mode.
+            '@mattermost/shared': sharedSource,
 
             // This alias restricts single version of styled components across all packages
             'styled-components': path.resolve(__dirname, '..', 'node_modules', 'styled-components'),

@@ -46,7 +46,10 @@ export default [
                 outputToFilesystem: true,
             }),
         ],
-        external: externals,
+
+        // Subpath imports must stay external too. Bundling shared/button here
+        // captures Parcel watch output and its private development JSX runtime.
+        external: (id) => externals.some((dependency) => id === dependency || id.startsWith(`${dependency}/`)),
         watch: {
             clearScreen: false,
         },
