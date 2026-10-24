@@ -1093,6 +1093,7 @@ $sidebarOpacityAnimationDuration: 0.15s;
             >i,
             .status.status--group,
             .badge,
+            .SidebarChannelLink__unread-count,
             .status-wrapper {
                 opacity: 0.4;
             }
@@ -1100,6 +1101,23 @@ $sidebarOpacityAnimationDuration: 0.15s;
 
         .SidebarMenu:not(.menuOpen) {
             display: none;
+        }
+
+        .SidebarChannelLink__unread-count {
+            display: flex;
+            min-width: 18px;
+            height: 18px;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            padding: 0 5px;
+            border-radius: 100px;
+            margin-left: 4px;
+            background: rgba(var(--sidebar-text-rgb), 0.24);
+            color: var(--sidebar-text);
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 18px;
         }
 
         .SidebarChannelLink__join-request-dot {
@@ -1147,6 +1165,7 @@ $sidebarOpacityAnimationDuration: 0.15s;
 
         .channel-pencil-icon,
         .badge,
+        .SidebarChannelLink__unread-count,
         .SidebarChannelLink__join-request-dot {
             // Hide the badge by hiding it instead of using `display: none` since the desktop app only counts
             // badges with a non-zero offsetHeight when counting notifications

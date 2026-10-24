@@ -49,6 +49,11 @@ type Props = WrappedComponentProps & {
     unreadMentions: number;
 
     /**
+     * Number of unread messages in this channel
+     */
+    unreadMsgs?: number;
+
+    /**
      * Whether or not the channel is shown as unread
      */
     isUnread: boolean;
@@ -150,6 +155,9 @@ export class SidebarChannelLink extends React.PureComponent<Props, State> {
         }
 
         if (this.props.isUnread && unreadMentions === 0) {
+            if (this.props.unreadMsgs) {
+                ariaLabel += ` ${this.props.unreadMsgs}`;
+            }
             ariaLabel += ` ${intl.formatMessage({id: 'accessibility.sidebar.types.unread', defaultMessage: 'unread'})}`;
         }
 
@@ -198,10 +206,13 @@ export class SidebarChannelLink extends React.PureComponent<Props, State> {
             label,
             link,
             unreadMentions,
+            unreadMsgs = 0,
             firstChannelName,
             showChannelsTutorialStep,
             hasUrgent,
         } = this.props;
+
+        const unreadMsgsLabel = unreadMsgs > 99 ? '99+' : String(unreadMsgs);
 
         let channelsTutorialTip: JSX.Element | null = null;
 
@@ -275,6 +286,16 @@ export class SidebarChannelLink extends React.PureComponent<Props, State> {
                     hasUrgent={hasUrgent}
                     tooltip={hasUrgent ? messages.urgentMentionTooltip : undefined}
                 />
+                {isUnread && unreadMentions === 0 && unreadMsgs > 0 && (
+
+                    // Not a `.badge`: the desktop app counts `.badge` elements as mentions.
+                    <span
+                        className='SidebarChannelLink__unread-count'
+                        data-testid='unreadMessagesCount'
+                    >
+                        {unreadMsgsLabel}
+                    </span>
+                )}
                 {this.props.hasPendingJoinRequests && (
                     <span
                         className='SidebarChannelLink__join-request-dot'

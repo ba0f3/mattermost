@@ -41,6 +41,7 @@ describe('components/sidebar/sidebar_channel/sidebar_channel_link', () => {
         label: 'channel_label',
         icon: null,
         unreadMentions: 0,
+        unreadMsgs: 0,
         isUnread: false,
         isMuted: false,
         isChannelSelected: false,
@@ -106,6 +107,31 @@ describe('components/sidebar/sidebar_channel/sidebar_channel_link', () => {
         const {container} = renderLink(props);
 
         expect(container).toMatchSnapshot();
+    });
+
+    test('should show unread message count when unread without mentions', () => {
+        renderLink({isUnread: true, unreadMentions: 0, unreadMsgs: 7});
+
+        expect(screen.getByTestId('unreadMessagesCount')).toHaveTextContent('7');
+        expect(screen.getByRole('link')).toHaveAccessibleName(/7 unread/i);
+    });
+
+    test('should cap unread message count at 99+', () => {
+        renderLink({isUnread: true, unreadMentions: 0, unreadMsgs: 250});
+
+        expect(screen.getByTestId('unreadMessagesCount')).toHaveTextContent('99+');
+    });
+
+    test('should show only the mention badge when there are mentions', () => {
+        renderLink({isUnread: true, unreadMentions: 2, unreadMsgs: 7});
+
+        expect(screen.queryByTestId('unreadMessagesCount')).not.toBeInTheDocument();
+    });
+
+    test('should not show unread message count when channel is not shown as unread', () => {
+        renderLink({isUnread: false, unreadMentions: 0, unreadMsgs: 7});
+
+        expect(screen.queryByTestId('unreadMessagesCount')).not.toBeInTheDocument();
     });
 
     test('should enable tooltip when needed', () => {
