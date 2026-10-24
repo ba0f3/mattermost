@@ -2048,6 +2048,8 @@ func TestSearchChannelsForUser(t *testing.T) {
 func TestMarkChannelAsUnreadFromPost(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
+	// Marking unread is refused while read receipts are enabled (the default).
+	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	u1 := th.BasicUser
 	u2 := th.BasicUser2
@@ -2991,6 +2993,8 @@ func TestMarkChannelAsUnreadFromPostCollapsedThreadsTurnedOff(t *testing.T) {
 	// Enable CRT
 
 	th := Setup(t).InitBasic(t)
+	// Marking unread is refused while read receipts are enabled (the default).
+	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.ServiceSettings.ThreadAutoFollow = true
@@ -3077,6 +3081,8 @@ func TestMarkChannelAsUnreadFromPostCollapsedThreadsTurnedOff(t *testing.T) {
 func TestMarkChannelAsUnreadFromPostStripsActionIntegrations(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
+	// Marking unread is refused while read receipts are enabled (the default).
+	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.ServiceSettings.ThreadAutoFollow = true
@@ -3151,6 +3157,8 @@ func TestMarkChannelAsUnreadFromPostStripsActionIntegrations(t *testing.T) {
 func TestMarkUnreadCRTOffUpdatesThreads(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
+	// Marking unread is refused while read receipts are enabled (the default).
+	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.ServiceSettings.ThreadAutoFollow = true

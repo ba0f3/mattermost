@@ -4100,11 +4100,6 @@
     "description": "Error returned by the read receipts endpoint when the post does not exist or the caller is not allowed to see its read receipts. Intentionally generic."
   },
   {
-    "id": "api.post.seen.opted_out.app_error",
-    "translation": "You have turned off read receipts, so you can't see who has seen your messages.",
-    "description": "Error returned to a user who opted out of read receipts when they ask who has seen their posts."
-  },
-  {
     "id": "api.post.seen.out_of_scope.app_error",
     "translation": "Read receipts are not available in this channel because it has too many members.",
     "description": "Error returned when read receipts are requested for a post in a channel larger than the configured read receipts member limit."
@@ -4158,6 +4153,11 @@
     "id": "api.post.send_notifications_and_forget.push_message",
     "translation": "sent you a message.",
     "description": "Mobile push notification body appended after the sender's name for a direct message; no leading space in source, sender name precedes it."
+  },
+  {
+    "id": "api.post.set_unread.read_receipts_enabled.app_error",
+    "translation": "Messages can't be marked as unread while read receipts are enabled.",
+    "description": "Error returned when a user tries to mark a post, channel or thread as unread while read receipts are enabled, because that would hide that they have read it."
   },
   {
     "id": "api.post.update_post.burn_on_read.app_error",

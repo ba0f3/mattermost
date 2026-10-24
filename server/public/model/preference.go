@@ -96,12 +96,6 @@ const (
 
 	PreferenceCategoryAuthorizedOAuthApp = "oauth_app"
 
-	// PreferenceCategoryReadReceipts holds the user's read receipt ("seen by")
-	// settings. When PreferenceNameReadReceiptsOptOut is set to "true" the user
-	// never appears in anyone's seen-by list and their channel views emit no
-	// post_seen websocket events.
-	PreferenceCategoryReadReceipts   = "read_receipts"
-	PreferenceNameReadReceiptsOptOut = "opt_out"
 	// the name for oauth_app is the client_id and value is the current scope
 
 	// Deprecated: PreferenceCategoryLastChannel is not used anymore.

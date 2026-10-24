@@ -1093,7 +1093,7 @@ func (s *ServiceSettings) SetDefaults(isUpdate bool) {
 	}
 
 	if s.EnableReadReceipts == nil {
-		s.EnableReadReceipts = new(false)
+		s.EnableReadReceipts = new(true)
 	}
 
 	if s.ReadReceiptsMaxChannelMembers == nil {

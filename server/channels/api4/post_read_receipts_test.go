@@ -35,12 +35,14 @@ func readReceiptsView(t *testing.T, th *TestHelper, userID, channelID string) {
 	require.Nil(t, appErr)
 }
 
-func readReceiptsOptOut(t *testing.T, th *TestHelper, userID string) {
+// readReceiptsLeftoverOptOut stores the preference of the removed per-user
+// read receipts opt-out. It must have no effect.
+func readReceiptsLeftoverOptOut(t *testing.T, th *TestHelper, userID string) {
 	t.Helper()
 	appErr := th.App.UpdatePreferences(th.Context, userID, model.Preferences{{
 		UserId:   userID,
-		Category: model.PreferenceCategoryReadReceipts,
-		Name:     model.PreferenceNameReadReceiptsOptOut,
+		Category: "read_receipts",
+		Name:     "opt_out",
 		Value:    "true",
 	}})
 	require.Nil(t, appErr)
@@ -110,13 +112,15 @@ func TestGetPostSeenBy(t *testing.T) {
 	}
 	th.RemoveUserFromChannel(t, leaver, channel)
 	th.UpdateActiveUser(t, deactivated, false)
-	readReceiptsOptOut(t, th, optedOut.Id)
+	readReceiptsLeftoverOptOut(t, th, optedOut.Id)
 
 	t.Run("lists only eligible current members, never the author", func(t *testing.T) {
 		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
 		require.NoError(t, err)
-		require.Equal(t, []string{viewer.Id}, seen.UserIds)
-		for _, absent := range []string{author.Id, idle.Id, leaver.Id, deactivated.Id, optedOut.Id, botUser.Id} {
+		expected := []string{viewer.Id, optedOut.Id}
+		sort.Strings(expected)
+		require.Equal(t, expected, seen.UserIds)
+		for _, absent := range []string{author.Id, idle.Id, leaver.Id, deactivated.Id, botUser.Id} {
 			assert.NotContains(t, seen.UserIds, absent)
 		}
 	})
@@ -150,7 +154,7 @@ func TestGetPostSeenBy(t *testing.T) {
 		require.Equal(t, missing.Where, notAuthor.Where)
 	})
 
-	t.Run("opted-out non-author still gets 404, not opted_out", func(t *testing.T) {
+	t.Run("non-author with a leftover opt-out preference still gets 404", func(t *testing.T) {
 		optedOutClient := loggedInClient(t, th, optedOut)
 		_, resp, err := optedOutClient.GetPostSeenBy(ctx, post.Id)
 		CheckNotFoundStatus(t, resp)
@@ -236,29 +240,17 @@ func TestGetPostSeenByGates(t *testing.T) {
 		require.Empty(t, seenStatus.Seen)
 	})
 
-	t.Run("opted-out author gets 403 opted_out on both endpoints", func(t *testing.T) {
-		readReceiptsOptOut(t, th, th.BasicUser.Id)
-		defer func() {
-			appErr := th.App.DeletePreferences(th.Context, th.BasicUser.Id, model.Preferences{{
-				UserId:   th.BasicUser.Id,
-				Category: model.PreferenceCategoryReadReceipts,
-				Name:     model.PreferenceNameReadReceiptsOptOut,
-			}})
-			require.Nil(t, appErr)
-		}()
+	t.Run("leftover opt-out preference has no effect for the author", func(t *testing.T) {
+		readReceiptsLeftoverOptOut(t, th, th.BasicUser.Id)
+		readReceiptsView(t, th, th.BasicUser2.Id, th.BasicChannel.Id)
 
-		_, resp, err := th.Client.GetPostSeenBy(ctx, post.Id)
-		CheckForbiddenStatus(t, resp)
-		requireAppErrorID(t, err, http.StatusForbidden, "api.post.seen.opted_out.app_error")
-
-		_, resp, err = th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
-		CheckForbiddenStatus(t, resp)
-		requireAppErrorID(t, err, http.StatusForbidden, "api.post.seen.opted_out.app_error")
-	})
-
-	t.Run("works again after opting back in", func(t *testing.T) {
-		_, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
 		require.NoError(t, err)
+		require.Contains(t, seen.UserIds, th.BasicUser2.Id)
+
+		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{post.Id: true}, status.Seen)
 	})
 }
 
@@ -449,18 +441,36 @@ func TestPostSeenWebSocketEvent(t *testing.T) {
 	noPostSeen("viewer", viewerWS)
 	noPostSeen("bystander", bystanderWS)
 
-	t.Run("opted-out viewer emits nothing and opted-out author receives nothing", func(t *testing.T) {
-		th.CreatePostWithClient(t, th.Client, channel)
-		readReceiptsOptOut(t, th, bystander.Id)
+	waitPostSeen := func(t *testing.T, postID, viewerID string) {
+		t.Helper()
+		timeout := time.After(10 * time.Second)
+		for {
+			select {
+			case event := <-authorWS.EventChannel:
+				if event.EventType() == model.WebsocketEventPostSeen && event.GetData()["post_id"] == postID {
+					require.Equal(t, viewerID, event.GetData()["user_id"])
+					return
+				}
+			case <-timeout:
+				require.FailNow(t, "author did not receive post_seen", "post %s viewer %s", postID, viewerID)
+			}
+		}
+	}
+
+	t.Run("leftover opt-out preference has no effect on events", func(t *testing.T) {
+		// Viewer with a leftover preference still emits to the author.
+		readReceiptsLeftoverOptOut(t, th, bystander.Id)
+		seenByBystander := th.CreatePostWithClient(t, th.Client, channel)
 		_, _, err := bystanderClient.ViewChannel(ctx, bystander.Id, &model.ChannelView{ChannelId: channel.Id})
 		require.NoError(t, err)
-		noPostSeen("author (opted-out viewer)", authorWS)
+		waitPostSeen(t, seenByBystander.Id, bystander.Id)
 
-		readReceiptsOptOut(t, th, author.Id)
-		th.CreatePostWithClient(t, th.Client, channel)
+		// Author with a leftover preference still receives events.
+		readReceiptsLeftoverOptOut(t, th, author.Id)
+		seenByViewer := th.CreatePostWithClient(t, th.Client, channel)
 		_, _, err = viewerClient.ViewChannel(ctx, viewer.Id, &model.ChannelView{ChannelId: channel.Id})
 		require.NoError(t, err)
-		noPostSeen("author (opted out)", authorWS)
+		waitPostSeen(t, seenByViewer.Id, viewer.Id)
 	})
 }
 
@@ -618,4 +628,97 @@ func TestGetPostsSeenStatusDeletedPost(t *testing.T) {
 	_, resp, err := th.Client.GetPostSeenBy(ctx, deleted.Id)
 	CheckNotFoundStatus(t, resp)
 	requireAppErrorID(t, err, http.StatusNotFound, "api.post.seen.not_found.app_error")
+}
+
+func TestMarkUnreadWithReadReceipts(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := setupReadReceipts(t)
+	ctx := context.Background()
+
+	// th.Client is the author, th.BasicUser.
+	viewer := th.BasicUser2
+	channel := th.BasicChannel
+	viewerClient := loggedInClient(t, th, viewer)
+
+	root := th.CreatePostWithClient(t, th.Client, channel)
+	reply, _, err := viewerClient.CreatePost(ctx, &model.Post{ChannelId: channel.Id, RootId: root.Id, Message: "reply"})
+	require.NoError(t, err)
+	post := th.CreatePostWithClient(t, th.Client, channel)
+	readReceiptsView(t, th, viewer.Id, channel.Id)
+
+	requireSeen := func(t *testing.T) {
+		t.Helper()
+		seen, _, err := th.Client.GetPostSeenBy(ctx, post.Id)
+		require.NoError(t, err)
+		require.Contains(t, seen.UserIds, viewer.Id)
+		status, _, err := th.Client.GetPostsSeenStatus(ctx, []string{post.Id})
+		require.NoError(t, err)
+		require.Equal(t, map[string]bool{post.Id: true}, status.Seen)
+	}
+	requireSeen(t)
+
+	member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+	require.Nil(t, appErr)
+	viewedAt := member.LastViewedAt
+	require.GreaterOrEqual(t, viewedAt, post.CreateAt)
+
+	const refusedID = "api.post.set_unread.read_receipts_enabled.app_error"
+
+	t.Run("enabled: post set_unread is refused and the author still sees it as seen", func(t *testing.T) {
+		_, err := viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, true)
+		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
+		_, err = viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, false)
+		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
+
+		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+		require.Nil(t, appErr)
+		require.Equal(t, viewedAt, member.LastViewedAt)
+		requireSeen(t)
+	})
+
+	t.Run("enabled: thread set_unread is refused without side effects", func(t *testing.T) {
+		before, appErr := th.App.GetThreadMembershipForUser(viewer.Id, root.Id)
+		require.Nil(t, appErr)
+
+		_, _, err := viewerClient.SetThreadUnreadByPostId(ctx, viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
+		requireAppErrorID(t, err, http.StatusForbidden, refusedID)
+
+		after, appErr := th.App.GetThreadMembershipForUser(viewer.Id, root.Id)
+		require.Nil(t, appErr)
+		require.Equal(t, before.LastViewed, after.LastViewed)
+		require.Equal(t, before.Following, after.Following)
+		requireSeen(t)
+	})
+
+	t.Run("enabled: permission checks still run first", func(t *testing.T) {
+		_, err := th.Client.SetPostUnread(ctx, viewer.Id, post.Id, true)
+		requireAppErrorID(t, err, http.StatusForbidden, "api.context.permissions.app_error")
+	})
+
+	t.Run("enabled: app callers are refused too", func(t *testing.T) {
+		_, appErr := th.App.MarkChannelAsUnreadFromPost(th.Context, post.Id, viewer.Id, true)
+		require.NotNil(t, appErr)
+		require.Equal(t, refusedID, appErr.Id)
+		_, appErr = th.App.UpdateThreadReadForUserByPost(th.Context, "", viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
+		require.NotNil(t, appErr)
+		require.Equal(t, refusedID, appErr.Id)
+		requireSeen(t)
+	})
+
+	t.Run("disabled: set_unread works as before", func(t *testing.T) {
+		th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
+		defer th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(true) })
+
+		resp, err := viewerClient.SetPostUnread(ctx, viewer.Id, post.Id, true)
+		require.NoError(t, err)
+		CheckOKStatus(t, resp)
+		member, appErr := th.App.GetChannelMember(th.Context, channel.Id, viewer.Id)
+		require.Nil(t, appErr)
+		require.Equal(t, post.CreateAt-1, member.LastViewedAt)
+
+		thread, resp, err := viewerClient.SetThreadUnreadByPostId(ctx, viewer.Id, th.BasicTeam.Id, root.Id, reply.Id)
+		require.NoError(t, err)
+		CheckOKStatus(t, resp)
+		require.Equal(t, root.Id, thread.PostId)
+	})
 }

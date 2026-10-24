@@ -4017,7 +4017,7 @@ func TestConfigServiceSettingsIsValid(t *testing.T) {
 	t.Run("read receipts settings", func(t *testing.T) {
 		cfg := Config{}
 		cfg.SetDefaults()
-		require.False(t, *cfg.ServiceSettings.EnableReadReceipts)
+		require.True(t, *cfg.ServiceSettings.EnableReadReceipts)
 		require.Equal(t, ServiceSettingsDefaultReadReceiptsMaxChannelMembers, *cfg.ServiceSettings.ReadReceiptsMaxChannelMembers)
 		require.Nil(t, cfg.ServiceSettings.isValid())
 

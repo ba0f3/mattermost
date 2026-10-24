@@ -2550,18 +2550,15 @@ func (s SqlChannelStore) GetMembersWithLastViewedAtSince(rctx request.CTX, chann
 }
 
 // readReceiptEligibleMembersQuery selects from ChannelMembers joined so that
-// only active, non-bot members that did not opt out of read receipts remain.
+// only active, non-bot members remain.
 func (s SqlChannelStore) readReceiptEligibleMembersQuery(columns ...string) sq.SelectBuilder {
 	return s.getQueryBuilder().
 		Select(columns...).
 		From("ChannelMembers").
 		InnerJoin("Users ON Users.Id = ChannelMembers.UserId").
 		LeftJoin("Bots ON Bots.UserId = ChannelMembers.UserId").
-		LeftJoin("Preferences ON Preferences.UserId = ChannelMembers.UserId AND Preferences.Category = ? AND Preferences.Name = ? AND Preferences.Value = ?",
-			model.PreferenceCategoryReadReceipts, model.PreferenceNameReadReceiptsOptOut, "true").
 		Where(sq.Eq{"Users.DeleteAt": 0}).
-		Where(sq.Eq{"Bots.UserId": nil}).
-		Where(sq.Eq{"Preferences.UserId": nil})
+		Where(sq.Eq{"Bots.UserId": nil})
 }
 
 func (s SqlChannelStore) GetReadReceiptMaxLastViewedAt(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {

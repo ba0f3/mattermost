@@ -4433,6 +4433,8 @@ func TestViewChannelShouldNotUpdateThreads(t *testing.T) {
 func TestCollapsedThreadFetch(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
+	// Marking unread is refused while read receipts are enabled (the default).
+	th.App.UpdateConfig(func(cfg *model.Config) { cfg.ServiceSettings.EnableReadReceipts = new(false) })
 
 	th.App.UpdateConfig(func(cfg *model.Config) {
 		*cfg.ServiceSettings.ThreadAutoFollow = true

@@ -3310,7 +3310,13 @@ func (a *App) UpdateThreadFollowForUserFromChannelAdd(rctx request.CTX, userID, 
 	return nil
 }
 
+// UpdateThreadReadForUserByPost marks a thread unread from postID. It is
+// refused while read receipts are enabled.
 func (a *App) UpdateThreadReadForUserByPost(rctx request.CTX, currentSessionId, userID, teamID, threadID, postID string) (*model.ThreadResponse, *model.AppError) {
+	if appErr := a.CheckMarkUnreadAllowed(); appErr != nil {
+		return nil, appErr
+	}
+
 	post, err := a.GetSinglePost(rctx, postID, false)
 	if err != nil {
 		return nil, err

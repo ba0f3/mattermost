@@ -10218,9 +10218,11 @@ func testChannelStoreGetReadReceiptUserIds(t *testing.T, rctx request.CTX, ss st
 	_, err := ss.Bot().Save(&model.Bot{UserId: botUser.Id, Username: botUser.Username, OwnerId: author.Id})
 	require.NoError(t, err)
 
+	// The per-user opt-out was removed; preferences left over from it must
+	// have no effect.
 	require.NoError(t, ss.Preference().Save(model.Preferences{
-		{UserId: optedOut.Id, Category: model.PreferenceCategoryReadReceipts, Name: model.PreferenceNameReadReceiptsOptOut, Value: "true"},
-		{UserId: optedBackIn.Id, Category: model.PreferenceCategoryReadReceipts, Name: model.PreferenceNameReadReceiptsOptOut, Value: "false"},
+		{UserId: optedOut.Id, Category: "read_receipts", Name: "opt_out", Value: "true"},
+		{UserId: optedBackIn.Id, Category: "read_receipts", Name: "opt_out", Value: "false"},
 	}))
 
 	const postCreateAt = int64(1000)
@@ -10243,7 +10245,7 @@ func testChannelStoreGetReadReceiptUserIds(t *testing.T, rctx request.CTX, ss st
 	t.Run("lists only eligible members who viewed after the post", func(t *testing.T) {
 		ids, err := ss.Channel().GetReadReceiptUserIds(rctx, c1.Id, postCreateAt, author.Id, 50)
 		require.NoError(t, err)
-		expected := []string{viewer.Id, viewer2.Id, optedBackIn.Id}
+		expected := []string{viewer.Id, viewer2.Id, optedOut.Id, optedBackIn.Id}
 		sort.Strings(expected)
 		require.Equal(t, expected, ids)
 	})

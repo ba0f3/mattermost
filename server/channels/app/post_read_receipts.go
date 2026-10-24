@@ -22,8 +22,9 @@ import (
 // Semantics: a user has "seen" a post when their ChannelMembers.LastViewedAt
 // for the post's channel is >= post.CreateAt. This means the user viewed (or
 // marked as read) the channel after the post was created; it does NOT prove
-// the message itself was read. Marking a channel unread from an earlier post
-// moves LastViewedAt back, so a user can drop out of a seen-by list again.
+// the message itself was read. While read receipts are enabled, the APIs
+// that would move LastViewedAt back (marking a post, thread or channel
+// unread) are refused, so once a user has seen a post they stay listed.
 //
 // Privacy rules (secaudit):
 //   - only the post author, while still a channel member, may read the list;
@@ -32,10 +33,10 @@ import (
 //   - only user IDs are ever returned or emitted, never timestamps;
 //   - only DM, GM and channels with at most
 //     ServiceSettings.ReadReceiptsMaxChannelMembers members are in scope;
-//   - bots, deactivated users, non-members, the author and users that opted
-//     out (preference read_receipts/opt_out = "true") are never listed;
-//   - opting out is two-way: an opted-out caller gets 403
-//     api.post.seen.opted_out.app_error and receives no post_seen events;
+//   - bots, deactivated users, non-members and the author are never listed;
+//   - there is no per-user opt-out: read receipts are a workspace setting
+//     (ServiceSettings.EnableReadReceipts, on by default) that only an admin
+//     can turn off;
 //   - bot sessions never get receipts: GET returns the not-found 404 and
 //     the batch endpoint returns an empty "seen" map, as if none of the
 //     posts were the caller's;
@@ -134,6 +135,16 @@ func (a *App) readReceiptsEnabled() bool {
 	return model.SafeDereference(a.Config().ServiceSettings.EnableReadReceipts)
 }
 
+// CheckMarkUnreadAllowed refuses moving a read pointer backward (marking a
+// post, channel or thread unread) while read receipts are enabled, so users
+// cannot hide that they have read a message.
+func (a *App) CheckMarkUnreadAllowed() *model.AppError {
+	if a.readReceiptsEnabled() {
+		return model.NewAppError("CheckMarkUnreadAllowed", "api.post.set_unread.read_receipts_enabled.app_error", nil, "", http.StatusForbidden)
+	}
+	return nil
+}
+
 // readReceiptsChannelInScope reports whether read receipts apply to channel:
 // DMs and GMs always, other message channels only up to the configured size.
 func (a *App) readReceiptsChannelInScope(rctx request.CTX, channel *model.Channel) (bool, *model.AppError) {
@@ -169,28 +180,6 @@ func postHasNoReadReceipts(post *model.Post) bool {
 func isBotSession(rctx request.CTX) bool {
 	session := rctx.Session()
 	return session != nil && session.IsBotUser()
-}
-
-func (a *App) userOptedOutOfReadReceipts(userID string) (bool, error) {
-	pref, err := a.Srv().Store().Preference().Get(userID, model.PreferenceCategoryReadReceipts, model.PreferenceNameReadReceiptsOptOut)
-	if err != nil {
-		if isNotFoundError(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return pref.Value == "true", nil
-}
-
-func (a *App) checkReadReceiptsCallerNotOptedOut(callerID string) *model.AppError {
-	optedOut, err := a.userOptedOutOfReadReceipts(callerID)
-	if err != nil {
-		return model.NewAppError("checkReadReceiptsCallerNotOptedOut", "api.post.seen.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
-	}
-	if optedOut {
-		return model.NewAppError("checkReadReceiptsCallerNotOptedOut", "api.post.seen.opted_out.app_error", nil, "", http.StatusForbidden)
-	}
-	return nil
 }
 
 // GetPostSeenBy returns the IDs of the users who have seen postID, see the
@@ -230,10 +219,6 @@ func (a *App) GetPostSeenBy(rctx request.CTX, postID, callerID string) ([]string
 		return nil, model.NewAppError("GetPostSeenBy", "api.post.seen.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
 
-	if appErr := a.checkReadReceiptsCallerNotOptedOut(callerID); appErr != nil {
-		return nil, appErr
-	}
-
 	channel, appErr := a.GetChannel(rctx, post.ChannelId)
 	if appErr != nil {
 		return nil, appErr
@@ -270,10 +255,6 @@ func (a *App) GetPostsSeenStatus(rctx request.CTX, postIDs []string, callerID st
 	result := map[string]bool{}
 	if isBotSession(rctx) {
 		return result, nil
-	}
-
-	if appErr := a.checkReadReceiptsCallerNotOptedOut(callerID); appErr != nil {
-		return nil, appErr
 	}
 
 	if len(postIDs) == 0 {
@@ -476,17 +457,7 @@ func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.We
 		return nil
 	}
 
-	optedOut, err := a.userOptedOutOfReadReceipts(viewer.Id)
-	if err != nil {
-		rctx.Logger().Warn("Failed to read read receipts preference", mlog.String("user_id", viewer.Id), mlog.Err(err))
-		return nil
-	}
-	if optedOut {
-		return nil
-	}
-
 	var events []*model.WebSocketEvent
-	authorOptedOut := map[string]bool{}
 	for _, channelID := range batch.channelIDs {
 		prevViewedAt, ok := batch.prevLastViewedAt[channelID]
 		if !ok {
@@ -540,17 +511,6 @@ func (a *App) postSeenEvents(rctx request.CTX, batch *postSeenBatch) []*model.We
 				continue
 			}
 			if post.UserId == viewer.Id || post.DeleteAt != 0 || postHasNoReadReceipts(post) || !members[post.UserId] {
-				continue
-			}
-			// Opt-out is two-way: opted-out authors get no seen events.
-			optedOut, known := authorOptedOut[post.UserId]
-			if !known {
-				var prefErr error
-				optedOut, prefErr = a.userOptedOutOfReadReceipts(post.UserId)
-				optedOut = optedOut || prefErr != nil
-				authorOptedOut[post.UserId] = optedOut
-			}
-			if optedOut {
 				continue
 			}
 			message := model.NewWebSocketEvent(model.WebsocketEventPostSeen, "", "", post.UserId, nil, "")

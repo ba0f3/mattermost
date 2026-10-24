@@ -1370,6 +1370,10 @@ func setPostUnread(c *Context, w http.ResponseWriter, r *http.Request) {
 		c.SetPermissionError(model.PermissionReadChannelContent)
 		return
 	}
+	if appErr := c.App.CheckMarkUnreadAllowed(); appErr != nil {
+		c.Err = appErr
+		return
+	}
 
 	state, err := c.App.MarkChannelAsUnreadFromPost(c.AppContext, c.Params.PostId, c.Params.UserId, collapsedThreadsSupported)
 	if err != nil {
