@@ -12,7 +12,7 @@ import {Permissions} from 'mattermost-redux/constants';
 import {makeGetChannelUnreadCount, getPendingJoinRequestsCount} from 'mattermost-redux/selectors/entities/channels';
 import {getCurrentUserId, getMyChannelMemberships} from 'mattermost-redux/selectors/entities/common';
 import {getConfig, isDiscoverableChannelsEnabled} from 'mattermost-redux/selectors/entities/general';
-import {getInt} from 'mattermost-redux/selectors/entities/preferences';
+import {getInt, shouldShowUnreadCount} from 'mattermost-redux/selectors/entities/preferences';
 import {haveIChannelPermission} from 'mattermost-redux/selectors/entities/roles';
 import {getRemoteNamesForChannel} from 'mattermost-redux/selectors/entities/shared_channels';
 import {getCurrentTeamId} from 'mattermost-redux/selectors/entities/teams';
@@ -80,7 +80,7 @@ function makeMapStateToProps() {
 
         return {
             unreadMentions: unreadCount.mentions,
-            unreadMsgs: unreadCount.messages,
+            unreadMsgs: shouldShowUnreadCount(state) ? unreadCount.messages : 0,
             isUnread: unreadCount.showUnread,
             isMuted: isChannelMuted(member),
             hasUrgent: unreadCount.hasUrgent,
