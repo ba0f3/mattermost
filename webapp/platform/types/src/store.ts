@@ -22,6 +22,7 @@ import type {LimitsState} from './limits';
 import type {PostsState} from './posts';
 import type {PreferenceType} from './preferences';
 import type {PropertiesState} from './properties';
+import type {ReadReceiptsState} from './read_receipts';
 import type {Recap, ScheduledRecap, RecapLimitStatus} from './recaps';
 import type {RenderPermissionsState} from './render_permissions';
 import type {
@@ -108,6 +109,7 @@ export type GlobalState = {
         contentFlagging: ContentFlaggingState;
         properties: PropertiesState;
         renderPermissions: RenderPermissionsState;
+        readReceipts: ReadReceiptsState;
         health: HealthState;
     };
     errors: any[];

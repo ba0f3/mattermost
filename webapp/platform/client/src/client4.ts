@@ -122,6 +122,7 @@ import type {ProductNotices} from '@mattermost/types/product_notices';
 import type {NameMappedPropertyFields, PropertyField, PropertyFieldOptionPage, PropertyValue} from '@mattermost/types/properties';
 import type {UserPropertyField, UserPropertyFieldPatch} from '@mattermost/types/properties_user';
 import type {Reaction} from '@mattermost/types/reactions';
+import type {PostSeenBy, PostsSeenStatus} from '@mattermost/types/read_receipts';
 import type {Recap, CreateRecapRequest, ScheduledRecap, ScheduledRecapInput, RecapLimitStatus} from '@mattermost/types/recaps';
 import type {RemoteCluster, RemoteClusterAcceptInvite, RemoteClusterPatch, RemoteClusterWithPassword} from '@mattermost/types/remote_clusters';
 import type {ActionSearchRequest, ActionSearchResponse} from '@mattermost/types/render_permissions';
@@ -2511,7 +2512,6 @@ export default class Client4 {
         );
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     deleteCustomProfileAttributeField = async (fieldId: string) => {
         return this.doFetch<StatusOK>(
             `${this.getCustomProfileAttributeFieldRoute(fieldId)}`,
@@ -2862,6 +2862,20 @@ export default class Client4 {
         return this.doFetch<Post[]>(
             `${this.getPostsRoute()}/ids`,
             {method: 'post', body: JSON.stringify(postIds)},
+        );
+    };
+
+    getPostSeenBy = (postId: string) => {
+        return this.doFetch<PostSeenBy>(
+            `${this.getPostRoute(postId)}/seen`,
+            {method: 'get'},
+        );
+    };
+
+    getPostsSeenStatus = (postIds: string[]) => {
+        return this.doFetch<PostsSeenStatus>(
+            `${this.getPostsRoute()}/seen_status`,
+            {method: 'post', body: JSON.stringify({post_ids: postIds})},
         );
     };
 

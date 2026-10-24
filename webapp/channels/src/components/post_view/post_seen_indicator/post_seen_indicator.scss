@@ -1,0 +1,23 @@
+.PostSeenIndicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    color: rgba(var(--center-channel-color-rgb), 0.48);
+
+    &--seen {
+        color: var(--button-bg);
+    }
+}
+
+// In a consecutive post the gutter also holds the narrow timestamp, which takes over on hover.
+.post__img .PostSeenIndicator {
+    margin: 6px 0 0;
+}
+
+.post:hover,
+.post.post--hovered,
+.post.a11y--active {
+    .post__img .PostSeenIndicator {
+        visibility: hidden;
+    }
+}

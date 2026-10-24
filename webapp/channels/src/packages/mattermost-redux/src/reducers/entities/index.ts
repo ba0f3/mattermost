@@ -24,6 +24,7 @@ import limits from './limits';
 import posts from './posts';
 import preferences from './preferences';
 import properties from './properties';
+import readReceipts from './read_receipts';
 import recaps from './recaps';
 import renderPermissions from './render_permissions';
 import roles from './roles';
@@ -70,5 +71,6 @@ export default combineReducers({
     contentFlagging,
     properties,
     renderPermissions,
+    readReceipts,
     health,
 });

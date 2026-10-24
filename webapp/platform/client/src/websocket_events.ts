@@ -10,6 +10,7 @@ export const enum WebSocketEvents {
     BurnOnReadPostRevealed = 'post_revealed',
     BurnOnReadPostBurned = 'post_burned',
     BurnOnReadPostAllRevealed = 'burn_on_read_all_revealed',
+    PostSeen = 'post_seen',
     ChannelConverted = 'channel_converted',
     ChannelCreated = 'channel_created',
     ChannelDeleted = 'channel_deleted',

@@ -28,6 +28,7 @@ import PluginTypes from './plugins';
 import PostTypes from './posts';
 import PreferenceTypes from './preferences';
 import PropertyTypes from './properties';
+import ReadReceiptTypes from './read_receipts';
 import RecapTypes from './recaps';
 import RenderPermissionTypes from './render_permissions';
 import RoleTypes from './roles';
@@ -75,6 +76,7 @@ export {
     PropertyTypes,
     AgentTypes,
     RenderPermissionTypes,
+    ReadReceiptTypes,
     HealthTypes,
     WebSocketTypes,
 };

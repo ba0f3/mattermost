@@ -37,6 +37,7 @@ import PostAriaLabelDiv from 'components/post_view/post_aria_label_div';
 import PostBodyAdditionalContent from 'components/post_view/post_body_additional_content';
 import PostMessageContainer from 'components/post_view/post_message_view';
 import PostPreHeader from 'components/post_view/post_pre_header';
+import PostSeenIndicator from 'components/post_view/post_seen_indicator';
 import PostTime from 'components/post_view/post_time';
 import ReactionList from 'components/post_view/reaction_list';
 import RedactedFilesPlaceholder from 'components/post_view/redacted_files_placeholder';
@@ -595,6 +596,11 @@ function PostComponent(props: Props) {
     // orphaned, so suppress it — it stays paired with the timestamp anchor in
     // `badges-wrapper`.
     const showPostHeaderBadge = showTimestamp && (!props.isConsecutivePost || props.compactDisplay);
+
+    // Read receipts sit next to the timestamp. A consecutive post has no header to hold them, so they
+    // sit in the left gutter, where CSS hides them on hover to make room for the narrow timestamp.
+    const showSeenIndicator = !isModal && props.location !== Locations.SEARCH;
+    const showSeenIndicatorInGutter = showSeenIndicator && props.isConsecutivePost && !props.compactDisplay;
     if (!hideProfilePicture && hideProfileCase) {
         profilePic = (
             <PostProfilePicture
@@ -825,6 +831,7 @@ function PostComponent(props: Props) {
                 >
                     <div className='post__img'>
                         {profilePic}
+                        {showSeenIndicatorInGutter && <PostSeenIndicator post={post}/>}
                     </div>
                     <div>
                         <div
@@ -846,6 +853,7 @@ function PostComponent(props: Props) {
                                         timestampProps={{...props.timestampProps, style: props.isConsecutivePost && !props.compactDisplay ? 'narrow' : undefined}}
                                     />
                                 }
+                                {showSeenIndicator && !showSeenIndicatorInGutter && showTimestamp && <PostSeenIndicator post={post}/>}
                                 {showPostHeaderBadge && (
                                     <Pluggable
                                         pluggableName='PostHeader'

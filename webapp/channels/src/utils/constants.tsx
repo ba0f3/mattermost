@@ -378,6 +378,7 @@ export const ModalIdentifiers = {
     QUICK_SWITCH: 'quick_switch',
     REMOVED_FROM_CHANNEL: 'removed_from_channel',
     SHOW_TRANSLATION: 'show_translation',
+    POST_SEEN_BY: 'post_seen_by',
     DISABLE_AUTOTRANSLATION_CONFIRM: 'disable_autotranslation_confirm',
     EMAIL_INVITE: 'email_invite',
     INTERACTIVE_DIALOG: 'interactive_dialog',
@@ -1002,6 +1003,7 @@ export const AdvancedSections = {
     FORMATTING: 'formatting',
     JOIN_LEAVE: 'joinLeave',
     PERFORMANCE_DEBUGGING: 'performanceDebugging',
+    READ_RECEIPTS: 'readReceipts',
     SYNC_DRAFTS: 'syncDrafts',
 };
 

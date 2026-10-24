@@ -14,6 +14,7 @@ import {getChannel} from 'mattermost-redux/selectors/entities/channels';
 import {getLicense, getConfig} from 'mattermost-redux/selectors/entities/general';
 import {getPost} from 'mattermost-redux/selectors/entities/posts';
 import {getBool, isCollapsedThreadsEnabled} from 'mattermost-redux/selectors/entities/preferences';
+import {canShowPostReadReceipts} from 'mattermost-redux/selectors/entities/read_receipts';
 import {
     getCurrentTeamId,
     getCurrentTeam,
@@ -140,6 +141,7 @@ function makeMapStateToProps() {
             canCopyText: !systemMessage && !isBoRPost,
             canCopyLink: !systemMessage && (!isBoRPost || isPostSender),
             canFlagContent,
+            canSeeReadReceipts: canShowPostReadReceipts(state, post),
             isBurnOnReadPost: isBoRPost,
             isUnrevealedBurnOnReadPost: shouldDisplayConcealedPlaceholder(state, post.id),
         };

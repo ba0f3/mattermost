@@ -16,6 +16,7 @@ export type WebSocketMessage = (
     Messages.BurnOnReadPostRevealed |
     Messages.BurnOnReadPostBurned |
     Messages.BurnOnReadPostAllRevealed |
+    Messages.PostSeen |
     Messages.EphemeralPost |
     Messages.PostReaction |
     Messages.PostAcknowledgement |
