@@ -1457,6 +1457,27 @@ func (s *RetryLayerBotStore) Update(bot *model.Bot) (*model.Bot, error) {
 
 }
 
+func (s *RetryLayerChannelStore) AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64, error) {
+
+	tries := 0
+	for {
+		result, resultVar1, err := s.ChannelStore.AdvanceReadReceiptSeenUpTo(rctx, channelIDs, userID, now)
+		if err == nil {
+			return result, resultVar1, nil
+		}
+		if !isRepeatableError(err) {
+			return result, resultVar1, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, resultVar1, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
 func (s *RetryLayerChannelStore) AnalyticsCountAll(teamID string) (map[model.ChannelType]int64, error) {
 
 	tries := 0
@@ -2971,6 +2992,48 @@ func (s *RetryLayerChannelStore) GetPublicChannelsForTeam(teamID string, offset 
 	tries := 0
 	for {
 		result, err := s.ChannelStore.GetPublicChannelsForTeam(teamID, offset, limit)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerChannelStore) GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetReadReceiptMaxSeenUpTo(rctx, channelIDs, excludeUserID)
+		if err == nil {
+			return result, nil
+		}
+		if !isRepeatableError(err) {
+			return result, err
+		}
+		tries++
+		if tries >= 3 {
+			err = errors.Wrap(err, "giving up after 3 consecutive repeatable transaction failures")
+			return result, err
+		}
+		timepkg.Sleep(100 * timepkg.Millisecond)
+	}
+
+}
+
+func (s *RetryLayerChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+
+	tries := 0
+	for {
+		result, err := s.ChannelStore.GetReadReceiptUserIds(rctx, channelID, since, excludeUserID, limit)
 		if err == nil {
 			return result, nil
 		}

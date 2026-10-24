@@ -3852,6 +3852,10 @@ func (a *App) MarkChannelsAsViewed(rctx request.CTX, channelIDs []string, userID
 		return nil, model.NewAppError("MarkChannelsAsViewed", "app.channel.get_channels_with_unreads_and_with_mentions.app_error", nil, "", http.StatusInternalServerError).Wrap(err)
 	}
 
+	// The read receipt seen pointer may lag LastViewedAt (for example after a
+	// view on the user's behalf), so it is advanced for every viewed channel.
+	a.schedulePostSeenEvents(rctx, a.advanceReadReceiptSeenUpTo(rctx, channelIDs, user))
+
 	if len(channelsToView) == 0 {
 		return times, nil
 	}

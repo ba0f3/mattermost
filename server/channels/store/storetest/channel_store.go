@@ -127,6 +127,8 @@ func TestChannelStore(t *testing.T, rctx request.CTX, ss store.Store, s SqlStore
 	t.Run("CountPostsAfter", func(t *testing.T) { testCountPostsAfter(t, rctx, ss) })
 	t.Run("CountUrgentPostsAfter", func(t *testing.T) { testCountUrgentPostsAfter(t, rctx, ss) })
 	t.Run("UpdateLastViewedAt", func(t *testing.T) { testChannelStoreUpdateLastViewedAt(t, rctx, ss) })
+	t.Run("GetReadReceiptUserIds", func(t *testing.T) { testChannelStoreGetReadReceiptUserIds(t, rctx, ss) })
+	t.Run("AdvanceReadReceiptSeenUpTo", func(t *testing.T) { testChannelStoreAdvanceReadReceiptSeenUpTo(t, rctx, ss) })
 	t.Run("IncrementMentionCount", func(t *testing.T) { testChannelStoreIncrementMentionCount(t, rctx, ss) })
 	t.Run("UpdateChannelMember", func(t *testing.T) { testUpdateChannelMember(t, rctx, ss) })
 	t.Run("GetMember", func(t *testing.T) { testGetMember(t, rctx, ss) })
@@ -10168,4 +10170,264 @@ func testChannelStoreGetTeamSpaceChannelsForUser(t *testing.T, rctx request.CTX,
 	empty, err := ss.Channel().GetTeamSpaceChannelsForUser(teamID, model.NewId())
 	require.NoError(t, err)
 	require.Empty(t, empty)
+}
+
+func testChannelStoreGetReadReceiptUserIds(t *testing.T, rctx request.CTX, ss store.Store) {
+	teamID := model.NewId()
+
+	newChannel := func(t *testing.T) *model.Channel {
+		t.Helper()
+		channel, err := ss.Channel().Save(rctx, &model.Channel{
+			TeamId:      teamID,
+			DisplayName: "ReadReceipts",
+			Name:        NewTestID(),
+			Type:        model.ChannelTypeOpen,
+			LastPostAt:  1_000_000,
+		}, -1)
+		require.NoError(t, err)
+		return channel
+	}
+	newUser := func(t *testing.T, deleteAt int64) *model.User {
+		t.Helper()
+		user, err := ss.User().Save(rctx, &model.User{Email: MakeEmail(), Username: model.NewUsername(), DeleteAt: deleteAt})
+		require.NoError(t, err)
+		return user
+	}
+	// addMember gives the member a seen pointer of seenUpTo while their
+	// LastViewedAt is far ahead: only the pointer may count.
+	addMember := func(t *testing.T, channelID, userID string, seenUpTo int64) {
+		t.Helper()
+		_, err := ss.Channel().SaveMember(rctx, &model.ChannelMember{
+			ChannelId:    channelID,
+			UserId:       userID,
+			NotifyProps:  model.GetDefaultChannelNotifyProps(),
+			LastViewedAt: 900_000,
+		})
+		require.NoError(t, err)
+		_, _, err = ss.Channel().AdvanceReadReceiptSeenUpTo(rctx, []string{channelID}, userID, seenUpTo)
+		require.NoError(t, err)
+	}
+
+	c1 := newChannel(t)
+	c2 := newChannel(t)
+	c3 := newChannel(t)
+
+	author := newUser(t, 0)
+	viewer := newUser(t, 0)
+	viewer2 := newUser(t, 0)
+	notYet := newUser(t, 0)
+	deactivated := newUser(t, model.GetMillis())
+	optedOut := newUser(t, 0)
+	optedBackIn := newUser(t, 0)
+	left := newUser(t, 0)
+	botUser := newUser(t, 0)
+	_, err := ss.Bot().Save(&model.Bot{UserId: botUser.Id, Username: botUser.Username, OwnerId: author.Id})
+	require.NoError(t, err)
+
+	// The per-user opt-out was removed; preferences left over from it must
+	// have no effect.
+	require.NoError(t, ss.Preference().Save(model.Preferences{
+		{UserId: optedOut.Id, Category: "read_receipts", Name: "opt_out", Value: "true"},
+		{UserId: optedBackIn.Id, Category: "read_receipts", Name: "opt_out", Value: "false"},
+	}))
+
+	const postCreateAt = int64(1000)
+	addMember(t, c1.Id, author.Id, 5000)
+	addMember(t, c1.Id, viewer.Id, postCreateAt)
+	addMember(t, c1.Id, viewer2.Id, 3000)
+	addMember(t, c1.Id, notYet.Id, postCreateAt-1)
+	addMember(t, c1.Id, deactivated.Id, 3000)
+	addMember(t, c1.Id, optedOut.Id, 3000)
+	addMember(t, c1.Id, optedBackIn.Id, 3000)
+	addMember(t, c1.Id, botUser.Id, 3000)
+	addMember(t, c1.Id, left.Id, 3000)
+	require.NoError(t, ss.Channel().RemoveMember(rctx, c1.Id, left.Id))
+	// left keeps their c1 seen pointer but is no longer a member; they only
+	// appear in another channel, which must not leak into c1.
+	addMember(t, c2.Id, left.Id, 900)
+	addMember(t, c2.Id, author.Id, 5000)
+	addMember(t, c3.Id, author.Id, 5000)
+	addMember(t, c3.Id, botUser.Id, 9000)
+
+	t.Run("lists only eligible members who viewed after the post", func(t *testing.T) {
+		ids, err := ss.Channel().GetReadReceiptUserIds(rctx, c1.Id, postCreateAt, author.Id, 50)
+		require.NoError(t, err)
+		expected := []string{viewer.Id, viewer2.Id, optedOut.Id, optedBackIn.Id}
+		sort.Strings(expected)
+		require.Equal(t, expected, ids)
+	})
+
+	t.Run("limit is applied", func(t *testing.T) {
+		ids, err := ss.Channel().GetReadReceiptUserIds(rctx, c1.Id, postCreateAt, author.Id, 1)
+		require.NoError(t, err)
+		require.Len(t, ids, 1)
+
+		ids, err = ss.Channel().GetReadReceiptUserIds(rctx, c1.Id, postCreateAt, author.Id, 0)
+		require.NoError(t, err)
+		require.NotNil(t, ids)
+		require.Empty(t, ids)
+	})
+
+	t.Run("nobody has seen it", func(t *testing.T) {
+		ids, err := ss.Channel().GetReadReceiptUserIds(rctx, c1.Id, 4000, author.Id, 50)
+		require.NoError(t, err)
+		require.NotNil(t, ids)
+		require.Empty(t, ids)
+	})
+
+	t.Run("max seen up to per channel", func(t *testing.T) {
+		got, err := ss.Channel().GetReadReceiptMaxSeenUpTo(rctx, []string{c1.Id, c2.Id, c3.Id}, author.Id)
+		require.NoError(t, err)
+		// c1: the deactivated, opted-out and bot members (3000) do not count
+		// but viewer2 does; c2: only the left user's new membership; c3: only
+		// a bot, so absent.
+		require.Equal(t, map[string]int64{c1.Id: 3000, c2.Id: 900}, got)
+
+		got, err = ss.Channel().GetReadReceiptMaxSeenUpTo(rctx, nil, author.Id)
+		require.NoError(t, err)
+		require.Empty(t, got)
+	})
+}
+
+func testChannelStoreAdvanceReadReceiptSeenUpTo(t *testing.T, rctx request.CTX, ss store.Store) {
+	teamID := model.NewId()
+
+	newChannel := func(t *testing.T, lastPostAt int64) *model.Channel {
+		t.Helper()
+		channel, err := ss.Channel().Save(rctx, &model.Channel{
+			TeamId:      teamID,
+			DisplayName: "ReadReceiptsSeen",
+			Name:        NewTestID(),
+			Type:        model.ChannelTypeOpen,
+			LastPostAt:  lastPostAt,
+		}, -1)
+		require.NoError(t, err)
+		return channel
+	}
+	newMember := func(t *testing.T, channelIDs ...string) *model.User {
+		t.Helper()
+		user, err := ss.User().Save(rctx, &model.User{Email: MakeEmail(), Username: model.NewUsername()})
+		require.NoError(t, err)
+		for _, channelID := range channelIDs {
+			_, err = ss.Channel().SaveMember(rctx, &model.ChannelMember{
+				ChannelId:   channelID,
+				UserId:      user.Id,
+				NotifyProps: model.GetDefaultChannelNotifyProps(),
+			})
+			require.NoError(t, err)
+		}
+		return user
+	}
+	seenSince := func(t *testing.T, channelID string, since int64) []string {
+		t.Helper()
+		ids, err := ss.Channel().GetReadReceiptUserIds(rctx, channelID, since, "", 50)
+		require.NoError(t, err)
+		return ids
+	}
+	advance := func(t *testing.T, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64) {
+		t.Helper()
+		prev, seenUpTo, err := ss.Channel().AdvanceReadReceiptSeenUpTo(rctx, channelIDs, userID, now)
+		require.NoError(t, err)
+		return prev, seenUpTo
+	}
+
+	t.Run("upsert keeps the greatest value, capped by LastPostAt and now", func(t *testing.T) {
+		channel := newChannel(t, 5000)
+		user := newMember(t, channel.Id)
+
+		prev, seenUpTo := advance(t, []string{channel.Id}, user.Id, 3000)
+		require.Equal(t, map[string]int64{channel.Id: 0}, prev)
+		require.Equal(t, map[string]int64{channel.Id: 3000}, seenUpTo, "capped by now")
+
+		// A future timestamp cannot push the pointer past LastPostAt.
+		prev, seenUpTo = advance(t, []string{channel.Id}, user.Id, 1_000_000)
+		require.Equal(t, map[string]int64{channel.Id: 3000}, prev)
+		require.Equal(t, map[string]int64{channel.Id: 5000}, seenUpTo, "capped by LastPostAt")
+		require.Equal(t, []string{user.Id}, seenSince(t, channel.Id, 5000))
+		require.Empty(t, seenSince(t, channel.Id, 5001))
+
+		// An older timestamp never lowers it, and an unchanged pointer is not
+		// reported as moved.
+		prev, seenUpTo = advance(t, []string{channel.Id}, user.Id, 1000)
+		require.Empty(t, prev)
+		require.Empty(t, seenUpTo)
+		prev, seenUpTo = advance(t, []string{channel.Id}, user.Id, 1_000_000)
+		require.Empty(t, prev)
+		require.Empty(t, seenUpTo)
+		require.Equal(t, []string{user.Id}, seenSince(t, channel.Id, 5000))
+	})
+
+	t.Run("several channels at once, members only", func(t *testing.T) {
+		c1 := newChannel(t, 2000)
+		c2 := newChannel(t, 4000)
+		empty := newChannel(t, 0)
+		notMember := newChannel(t, 4000)
+		user := newMember(t, c1.Id, c2.Id, empty.Id)
+
+		prev, seenUpTo := advance(t, []string{c1.Id, c2.Id, c2.Id, empty.Id, notMember.Id, model.NewId()}, user.Id, 3000)
+		require.Equal(t, map[string]int64{c1.Id: 0, c2.Id: 0}, prev)
+		require.Equal(t, map[string]int64{c1.Id: 2000, c2.Id: 3000}, seenUpTo)
+
+		// No row was written for the channel the user is not a member of.
+		_, err := ss.Channel().SaveMember(rctx, &model.ChannelMember{
+			ChannelId:   notMember.Id,
+			UserId:      user.Id,
+			NotifyProps: model.GetDefaultChannelNotifyProps(),
+		})
+		require.NoError(t, err)
+		require.Empty(t, seenSince(t, notMember.Id, 1))
+	})
+
+	t.Run("member updates never lower the pointer", func(t *testing.T) {
+		channel := newChannel(t, 5000)
+		user := newMember(t, channel.Id)
+		advance(t, []string{channel.Id}, user.Id, 6000)
+
+		member, err := ss.Channel().GetMember(rctx, channel.Id, user.Id)
+		require.NoError(t, err)
+		member.LastViewedAt = 1
+		member.MsgCount = 0
+		_, err = ss.Channel().UpdateMember(rctx, member)
+		require.NoError(t, err)
+		require.Equal(t, []string{user.Id}, seenSince(t, channel.Id, 5000))
+
+		member.LastViewedAt = 2
+		_, err = ss.Channel().UpdateMultipleMembers([]*model.ChannelMember{member})
+		require.NoError(t, err)
+		require.Equal(t, []string{user.Id}, seenSince(t, channel.Id, 5000))
+
+		_, err = ss.Channel().UpdateLastViewedAt([]string{channel.Id}, user.Id)
+		require.NoError(t, err)
+		require.Equal(t, []string{user.Id}, seenSince(t, channel.Id, 5000))
+	})
+
+	t.Run("permanent deletes remove the pointers", func(t *testing.T) {
+		c1 := newChannel(t, 5000)
+		c2 := newChannel(t, 5000)
+		user := newMember(t, c1.Id, c2.Id)
+		other := newMember(t, c1.Id)
+		advance(t, []string{c1.Id, c2.Id}, user.Id, 6000)
+		advance(t, []string{c1.Id}, other.Id, 6000)
+
+		require.NoError(t, ss.Channel().PermanentDeleteMembersByUser(rctx, user.Id))
+		for _, channelID := range []string{c1.Id, c2.Id} {
+			_, err := ss.Channel().SaveMember(rctx, &model.ChannelMember{
+				ChannelId:   channelID,
+				UserId:      user.Id,
+				NotifyProps: model.GetDefaultChannelNotifyProps(),
+			})
+			require.NoError(t, err)
+		}
+		require.Equal(t, []string{other.Id}, seenSince(t, c1.Id, 1))
+		require.Empty(t, seenSince(t, c2.Id, 1))
+
+		require.NoError(t, ss.Channel().PermanentDeleteMembersByChannel(rctx, c1.Id))
+		_, err := ss.Channel().SaveMember(rctx, &model.ChannelMember{
+			ChannelId:   c1.Id,
+			UserId:      other.Id,
+			NotifyProps: model.GetDefaultChannelNotifyProps(),
+		})
+		require.NoError(t, err)
+		require.Empty(t, seenSince(t, c1.Id, 1))
+	})
 }

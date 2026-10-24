@@ -95,6 +95,7 @@ const (
 	MaxPreferenceValueLength             = 20000
 
 	PreferenceCategoryAuthorizedOAuthApp = "oauth_app"
+
 	// the name for oauth_app is the client_id and value is the current scope
 
 	// Deprecated: PreferenceCategoryLastChannel is not used anymore.

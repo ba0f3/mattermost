@@ -16,6 +16,45 @@ type ChannelStore struct {
 	mock.Mock
 }
 
+// AdvanceReadReceiptSeenUpTo provides a mock function with given fields: rctx, channelIDs, userID, now
+func (_m *ChannelStore) AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64, error) {
+	ret := _m.Called(rctx, channelIDs, userID, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AdvanceReadReceiptSeenUpTo")
+	}
+
+	var r0 map[string]int64
+	var r1 map[string]int64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string, int64) (map[string]int64, map[string]int64, error)); ok {
+		return rf(rctx, channelIDs, userID, now)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string, int64) map[string]int64); ok {
+		r0 = rf(rctx, channelIDs, userID, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, []string, string, int64) map[string]int64); ok {
+		r1 = rf(rctx, channelIDs, userID, now)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(map[string]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(2).(func(request.CTX, []string, string, int64) error); ok {
+		r2 = rf(rctx, channelIDs, userID, now)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
 // AnalyticsCountAll provides a mock function with given fields: teamID
 func (_m *ChannelStore) AnalyticsCountAll(teamID string) (map[model.ChannelType]int64, error) {
 	ret := _m.Called(teamID)
@@ -1432,6 +1471,36 @@ func (_m *ChannelStore) GetFileCount(channelID string) (int64, error) {
 	return r0, r1
 }
 
+// GetForPolicy provides a mock function with given fields: rctx, id
+func (_m *ChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
+	ret := _m.Called(rctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetForPolicy")
+	}
+
+	var r0 *model.Channel
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, string) (*model.Channel, error)); ok {
+		return rf(rctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, string) *model.Channel); ok {
+		r0 = rf(rctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.Channel)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, string) error); ok {
+		r1 = rf(rctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetForPost provides a mock function with given fields: postID
 func (_m *ChannelStore) GetForPost(postID string) (*model.Channel, error) {
 	ret := _m.Called(postID)
@@ -1483,34 +1552,6 @@ func (_m *ChannelStore) GetGuestCount(channelID string, allowFromCache bool) (in
 
 	if rf, ok := ret.Get(1).(func(string, bool) error); ok {
 		r1 = rf(channelID, allowFromCache)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetForPolicy provides a mock function with given fields: rctx, id
-func (_m *ChannelStore) GetForPolicy(rctx request.CTX, id string) (*model.Channel, error) {
-	ret := _m.Called(rctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetForPolicy")
-	}
-
-	var r0 *model.Channel
-	var r1 error
-	if rf, ok := ret.Get(0).(func(request.CTX, string) (*model.Channel, error)); ok {
-		return rf(rctx, id)
-	}
-	if rf, ok := ret.Get(0).(func(request.CTX, string) *model.Channel); ok {
-		r0 = rf(rctx, id)
-	} else if ret.Get(0) != nil {
-		r0 = ret.Get(0).(*model.Channel)
-	}
-
-	if rf, ok := ret.Get(1).(func(request.CTX, string) error); ok {
-		r1 = rf(rctx, id)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2153,6 +2194,66 @@ func (_m *ChannelStore) GetPublicChannelsForTeam(teamID string, offset int, limi
 
 	if rf, ok := ret.Get(1).(func(string, int, int) error); ok {
 		r1 = rf(teamID, offset, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetReadReceiptMaxSeenUpTo provides a mock function with given fields: rctx, channelIDs, excludeUserID
+func (_m *ChannelStore) GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+	ret := _m.Called(rctx, channelIDs, excludeUserID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReadReceiptMaxSeenUpTo")
+	}
+
+	var r0 map[string]int64
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string) (map[string]int64, error)); ok {
+		return rf(rctx, channelIDs, excludeUserID)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, []string, string) map[string]int64); ok {
+		r0 = rf(rctx, channelIDs, excludeUserID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]int64)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, []string, string) error); ok {
+		r1 = rf(rctx, channelIDs, excludeUserID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetReadReceiptUserIds provides a mock function with given fields: rctx, channelID, since, excludeUserID, limit
+func (_m *ChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+	ret := _m.Called(rctx, channelID, since, excludeUserID, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetReadReceiptUserIds")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(request.CTX, string, int64, string, int) ([]string, error)); ok {
+		return rf(rctx, channelID, since, excludeUserID, limit)
+	}
+	if rf, ok := ret.Get(0).(func(request.CTX, string, int64, string, int) []string); ok {
+		r0 = rf(rctx, channelID, since, excludeUserID, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(request.CTX, string, int64, string, int) error); ok {
+		r1 = rf(rctx, channelID, since, excludeUserID, limit)
 	} else {
 		r1 = ret.Error(1)
 	}

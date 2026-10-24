@@ -1360,6 +1360,22 @@ func (s *TimerLayerBotStore) Update(bot *model.Bot) (*model.Bot, error) {
 	return result, err
 }
 
+func (s *TimerLayerChannelStore) AdvanceReadReceiptSeenUpTo(rctx request.CTX, channelIDs []string, userID string, now int64) (map[string]int64, map[string]int64, error) {
+	start := time.Now()
+
+	result, resultVar1, err := s.ChannelStore.AdvanceReadReceiptSeenUpTo(rctx, channelIDs, userID, now)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.AdvanceReadReceiptSeenUpTo", success, elapsed)
+	}
+	return result, resultVar1, err
+}
+
 func (s *TimerLayerChannelStore) AnalyticsCountAll(teamID string) (map[model.ChannelType]int64, error) {
 	start := time.Now()
 
@@ -2554,6 +2570,38 @@ func (s *TimerLayerChannelStore) GetPublicChannelsForTeam(teamID string, offset 
 			success = "true"
 		}
 		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetPublicChannelsForTeam", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerChannelStore) GetReadReceiptMaxSeenUpTo(rctx request.CTX, channelIDs []string, excludeUserID string) (map[string]int64, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetReadReceiptMaxSeenUpTo(rctx, channelIDs, excludeUserID)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetReadReceiptMaxSeenUpTo", success, elapsed)
+	}
+	return result, err
+}
+
+func (s *TimerLayerChannelStore) GetReadReceiptUserIds(rctx request.CTX, channelID string, since int64, excludeUserID string, limit int) ([]string, error) {
+	start := time.Now()
+
+	result, err := s.ChannelStore.GetReadReceiptUserIds(rctx, channelID, since, excludeUserID, limit)
+
+	elapsed := float64(time.Since(start)) / float64(time.Second)
+	if s.Root.Metrics != nil {
+		success := "false"
+		if err == nil {
+			success = "true"
+		}
+		s.Root.Metrics.ObserveStoreMethodDuration("ChannelStore.GetReadReceiptUserIds", success, elapsed)
 	}
 	return result, err
 }

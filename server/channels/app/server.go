@@ -106,6 +106,11 @@ type Server struct {
 	ListenAddr  *net.TCPAddr
 	RateLimiter *RateLimiter
 
+	// readReceipts holds the rate limiters of the read receipts ("seen by")
+	// feature. It is created lazily, see Server.readReceiptsLimiters.
+	readReceiptsOnce sync.Once
+	readReceipts     *readReceiptsLimiters
+
 	localModeServer *http.Server
 
 	didFinishListen chan struct{}

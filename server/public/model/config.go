@@ -144,6 +144,13 @@ const (
 	ServiceSettingsDefaultMaxURLLength           = 2048
 	ServiceSettingsMaxUniqueReactionsPerPost     = 500
 
+	// ServiceSettingsDefaultReadReceiptsMaxChannelMembers is the default largest
+	// (non DM/GM) channel for which read receipts ("seen by") are computed.
+	ServiceSettingsDefaultReadReceiptsMaxChannelMembers = 50
+	// ServiceSettingsMaxReadReceiptsMaxChannelMembers bounds the configurable
+	// threshold so the seen-by query and websocket fan-out stay cheap.
+	ServiceSettingsMaxReadReceiptsMaxChannelMembers = 500
+
 	TeamSettingsDefaultSiteName              = "Mattermost"
 	TeamSettingsDefaultMaxUsersPerTeam       = 50
 	TeamSettingsDefaultCustomBrandText       = ""
@@ -507,6 +514,8 @@ type ServiceSettings struct {
 	BurnOnReadDurationSeconds                         *int    `access:"site_posts"`
 	BurnOnReadMaximumTimeToLiveSeconds                *int    `access:"site_posts"`
 	BurnOnReadSchedulerFrequencySeconds               *int    `access:"site_posts,cloud_restrictable"`
+	EnableReadReceipts                                *bool   `access:"site_posts"`
+	ReadReceiptsMaxChannelMembers                     *int    `access:"site_posts"`
 	EnableAPIChannelDeletion                          *bool
 	EnableLocalMode                                   *bool   `access:"cloud_restrictable"`
 	LocalModeSocketLocation                           *string `access:"cloud_restrictable"` // telemetry: none
@@ -1081,6 +1090,14 @@ func (s *ServiceSettings) SetDefaults(isUpdate bool) {
 
 	if s.BurnOnReadSchedulerFrequencySeconds == nil {
 		s.BurnOnReadSchedulerFrequencySeconds = new(600) // 10 minutes in seconds
+	}
+
+	if s.EnableReadReceipts == nil {
+		s.EnableReadReceipts = new(true)
+	}
+
+	if s.ReadReceiptsMaxChannelMembers == nil {
+		s.ReadReceiptsMaxChannelMembers = new(ServiceSettingsDefaultReadReceiptsMaxChannelMembers)
 	}
 
 	if s.MaximumPayloadSizeBytes == nil {
@@ -5244,6 +5261,9 @@ func (s *ServiceSettings) isValid() *AppError {
 	}
 	if *s.PersistentNotificationMaxRecipients <= 0 {
 		return NewAppError("Config.IsValid", "model.config.is_valid.persistent_notifications_recipients.app_error", nil, "", http.StatusBadRequest)
+	}
+	if *s.ReadReceiptsMaxChannelMembers <= 0 || *s.ReadReceiptsMaxChannelMembers > ServiceSettingsMaxReadReceiptsMaxChannelMembers {
+		return NewAppError("Config.IsValid", "model.config.is_valid.read_receipts_max_channel_members.app_error", map[string]any{"Max": ServiceSettingsMaxReadReceiptsMaxChannelMembers}, "", http.StatusBadRequest)
 	}
 
 	for _, pattern := range s.DCRRedirectURIAllowlist {

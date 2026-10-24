@@ -6,6 +6,7 @@ package api4
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -55,6 +56,9 @@ func (api *API) InitPost() {
 	api.BaseRoutes.Posts.Handle("/rewrite", api.APISessionRequired(rewriteMessage)).Methods(http.MethodPost)
 	api.BaseRoutes.Post.Handle("/reveal", api.APISessionRequired(revealPost)).Methods(http.MethodGet)
 	api.BaseRoutes.Post.Handle("/burn", api.APISessionRequired(burnPost)).Methods(http.MethodDelete)
+
+	api.BaseRoutes.Post.Handle("/seen", api.APISessionRequired(getPostSeenBy)).Methods(http.MethodGet)
+	api.BaseRoutes.Posts.Handle("/seen_status", api.APISessionRequired(getPostsSeenStatus)).Methods(http.MethodPost)
 }
 
 // rejectOversizedMessage sets c.Err and returns true if message is longer than the configured
@@ -2037,4 +2041,82 @@ func burnPost(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	auditRec.Success()
 	ReturnStatusOK(w)
+}
+
+// readReceiptsRateLimited applies the per-user read receipts rate limit. It
+// writes a 429 response and returns true when the caller is over the limit.
+func readReceiptsRateLimited(c *Context, w http.ResponseWriter, r *http.Request) bool {
+	limiter := c.App.Srv().ReadReceiptsRateLimiter()
+	if limiter == nil {
+		// Fail closed: never serve read receipts without a working limiter.
+		c.Err = model.NewAppError("readReceiptsRateLimited", "api.post.seen.app_error", nil, "rate limiter unavailable", http.StatusServiceUnavailable)
+		return true
+	}
+	return limiter.UserIdRateLimit(r.Context(), c.AppContext.Session().UserId, w)
+}
+
+// getPostSeenBy returns the IDs of the users who have seen a post. Only the
+// post author may call it, see App.GetPostSeenBy for the rules.
+func getPostSeenBy(c *Context, w http.ResponseWriter, r *http.Request) {
+	c.RequirePostId()
+	if c.Err != nil {
+		return
+	}
+
+	if readReceiptsRateLimited(c, w, r) {
+		return
+	}
+
+	userIDs, appErr := c.App.GetPostSeenBy(c.AppContext, c.Params.PostId, c.AppContext.Session().UserId)
+	if appErr != nil {
+		c.Err = appErr
+		return
+	}
+
+	if userIDs == nil {
+		userIDs = []string{}
+	}
+	if err := json.NewEncoder(w).Encode(model.PostSeenBy{UserIds: userIDs}); err != nil {
+		c.Logger.Warn("Error while writing response", mlog.Err(err))
+	}
+}
+
+// getPostsSeenStatus reports, for the caller's own posts among post_ids,
+// whether each has been seen by at least one eligible member.
+func getPostsSeenStatus(c *Context, w http.ResponseWriter, r *http.Request) {
+	if readReceiptsRateLimited(c, w, r) {
+		return
+	}
+
+	var req model.PostsSeenStatusRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 64*1024)).Decode(&req); err != nil {
+		c.Err = model.NewAppError("getPostsSeenStatus", model.PayloadParseError, nil, "", http.StatusBadRequest).Wrap(err)
+		return
+	}
+	if len(req.PostIds) > app.ReadReceiptsMaxSeenStatusPosts {
+		c.Err = model.NewAppError("getPostsSeenStatus", "api.post.seen_status.too_many_ids.app_error", map[string]any{"Max": app.ReadReceiptsMaxSeenStatusPosts}, "", http.StatusBadRequest)
+		return
+	}
+	postIDs := make([]string, 0, len(req.PostIds))
+	for _, id := range req.PostIds {
+		if !model.IsValidId(id) {
+			c.SetInvalidParam("post_ids")
+			return
+		}
+		postIDs = append(postIDs, id)
+	}
+	postIDs = model.RemoveDuplicateStrings(postIDs)
+
+	seen, appErr := c.App.GetPostsSeenStatus(c.AppContext, postIDs, c.AppContext.Session().UserId)
+	if appErr != nil {
+		c.Err = appErr
+		return
+	}
+
+	if seen == nil {
+		seen = map[string]bool{}
+	}
+	if err := json.NewEncoder(w).Encode(model.PostsSeenStatus{Seen: seen}); err != nil {
+		c.Logger.Warn("Error while writing response", mlog.Err(err))
+	}
 }
