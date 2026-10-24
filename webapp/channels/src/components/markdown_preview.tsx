@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 
 import classNames from 'classnames';
-import React, {useEffect, useLayoutEffect, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useState} from 'react';
 import {FormattedMessage, useIntl} from 'react-intl';
 
 import type {FileInfo} from '@mattermost/types/files';
@@ -18,6 +18,7 @@ import Constants from 'utils/constants';
 import * as SyntaxHighlighting from 'utils/syntax_highlighting';
 
 import type {LinkInfo} from './file_preview_modal/types';
+import MermaidDiagram, {markdownOptions, splitMermaidBlocks} from './markdown_preview_mermaid';
 
 import './markdown_preview.scss';
 
@@ -44,6 +45,7 @@ const MarkdownPreview = ({
     const [content, setContent] = useState('');
     const [status, setStatus] = useState<'success' | 'loading' | 'fail'>('loading');
     const [viewMode, setViewMode] = useState<ViewMode>('preview');
+    const segments = useMemo(() => splitMermaidBlocks(content), [content]);
 
     // Always read the file through the authenticated file API (GET /api/v4/files/{id}), which enforces
     // channel read permission server-side. Never fetch an arbitrary URL from here.
@@ -145,20 +147,27 @@ const MarkdownPreview = ({
     } else {
         // Rendered through the standard post markdown pipeline: marked with sanitize (raw HTML escaped),
         // Renderer.link drops javascript:/vbscript:/data: hrefs, and images go through MarkdownImage/ExternalImage
-        // which applies the image proxy exactly like posts.
+        // which applies the image proxy exactly like posts. Fenced mermaid blocks are rendered as sanitized SVG images.
         body = (
             <div
                 className='markdown-preview__content'
                 data-testid='markdown-preview-rendered'
             >
-                <Markdown
-                    message={content}
-                    options={{
-                        atMentions: false,
-                        mentionHighlight: false,
-                        markdown: true,
-                    }}
-                />
+                {segments.map((segment, index) => (
+
+                    // Segments are positional slices of the file content, so the index is a stable key.
+                    // eslint-disable-next-line react/no-array-index-key
+                    <React.Fragment key={index}>
+                        {segment.type === 'mermaid' ? (
+                            <MermaidDiagram segment={segment}/>
+                        ) : (
+                            <Markdown
+                                message={segment.text}
+                                options={markdownOptions}
+                            />
+                        )}
+                    </React.Fragment>
+                ))}
             </div>
         );
     }
