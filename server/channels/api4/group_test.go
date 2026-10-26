@@ -2292,9 +2292,9 @@ func TestGetGroupsByNames(t *testing.T) {
 	t.Run("without license", func(t *testing.T) {
 		th.App.Srv().SetLicense(nil)
 		groups, resp, err := th.SystemAdminClient.GetGroupsByNames(context.Background(), []string{*groupName})
-		require.Error(t, err)
-		CheckNotImplementedStatus(t, resp)
-		assert.Nil(t, groups)
+		require.NoError(t, err)
+		CheckOKStatus(t, resp)
+		assert.Empty(t, groups, "LDAP groups should remain hidden when unlicensed")
 	})
 
 	th.App.Srv().SetLicense(model.NewTestLicenseSKU(model.LicenseShortSkuProfessional))
@@ -2481,9 +2481,10 @@ func TestGetGroupsByUserId(t *testing.T) {
 	assert.Nil(t, appErr)
 
 	th.App.Srv().SetLicense(nil)
-	_, response, err := th.SystemAdminClient.GetGroupsByUserId(context.Background(), user1.Id)
-	require.Error(t, err)
-	CheckNotImplementedStatus(t, response)
+	unlicensedGroups, response, err := th.SystemAdminClient.GetGroupsByUserId(context.Background(), user1.Id)
+	require.NoError(t, err)
+	CheckOKStatus(t, response)
+	assert.Empty(t, unlicensedGroups, "LDAP group memberships should remain hidden when unlicensed")
 
 	th.App.Srv().SetLicense(model.NewTestLicense("ldap"))
 	_, response, err = th.SystemAdminClient.GetGroupsByUserId(context.Background(), "")
@@ -3744,4 +3745,109 @@ func TestLinkGroupTeam_AutoAddOnlyAddsGroupMembers(t *testing.T) {
 	tm, appErr := th.App.GetTeamMember(th.Context, th.BasicTeam.Id, newUser.Id)
 	require.Nil(t, appErr)
 	assert.Equal(t, newUser.Id, tm.UserId)
+}
+
+func TestCustomGroupsWithoutLicense(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := Setup(t).InitBasic(t)
+	th.App.Srv().SetLicense(nil)
+	ctx := context.Background()
+
+	groupName := "custom_" + model.NewId()
+	group := &model.Group{
+		DisplayName:    "Engineering",
+		Name:           &groupName,
+		Source:         model.GroupSourceCustom,
+		AllowReference: true,
+	}
+	created, response, err := th.SystemAdminClient.CreateGroup(ctx, group)
+	require.NoError(t, err)
+	CheckCreatedStatus(t, response)
+
+	loaded, _, err := th.SystemAdminClient.GetGroup(ctx, created.Id, "")
+	require.NoError(t, err)
+	require.Equal(t, created.Id, loaded.Id)
+
+	ldapName := "ldap_" + model.NewId()
+	ldap, appErr := th.App.CreateGroup(&model.Group{
+		DisplayName:    "Legacy LDAP",
+		Name:           &ldapName,
+		Source:         model.GroupSourceLdap,
+		AllowReference: true,
+		RemoteId:       new(model.NewId()),
+	})
+	require.Nil(t, appErr)
+
+	allGroups, _, err := th.SystemAdminClient.GetGroups(ctx, model.GroupSearchOpts{})
+	require.NoError(t, err)
+	for _, listed := range allGroups {
+		require.Equal(t, model.GroupSourceCustom, listed.Source)
+	}
+
+	groupsByName, _, err := th.SystemAdminClient.GetGroupsByNames(ctx, []string{groupName, ldapName})
+	require.NoError(t, err)
+	require.Len(t, groupsByName, 1)
+	require.Equal(t, created.Id, groupsByName[0].Id)
+
+	members, response, err := th.SystemAdminClient.UpsertGroupMembers(ctx, created.Id, &model.GroupModifyMembers{
+		UserIds: []string{th.BasicUser.Id},
+	})
+	require.NoError(t, err)
+	CheckOKStatus(t, response)
+	require.Len(t, members, 1)
+
+	memberPage, _, err := th.SystemAdminClient.GetGroupMembers(ctx, created.Id)
+	require.NoError(t, err)
+	require.Equal(t, 1, memberPage.Count)
+
+	userGroups, _, err := th.SystemAdminClient.GetGroupsByUserId(ctx, th.BasicUser.Id)
+	require.NoError(t, err)
+	require.Len(t, userGroups, 1)
+	require.Equal(t, created.Id, userGroups[0].Id)
+
+	updated, _, err := th.SystemAdminClient.PatchGroup(ctx, created.Id, &model.GroupPatch{DisplayName: new("Engineering Team")})
+	require.NoError(t, err)
+	require.Equal(t, "Engineering Team", updated.DisplayName)
+
+	_, response, err = th.SystemAdminClient.GetGroups(ctx, model.GroupSearchOpts{Source: model.GroupSourceLdap})
+	require.Error(t, err)
+	CheckNotImplementedStatus(t, response)
+
+	_, response, err = th.SystemAdminClient.DeleteGroupMembers(ctx, created.Id, &model.GroupModifyMembers{
+		UserIds: []string{th.BasicUser.Id},
+	})
+	require.NoError(t, err)
+	CheckOKStatus(t, response)
+
+	_, response, err = th.SystemAdminClient.DeleteGroup(ctx, created.Id)
+	require.NoError(t, err)
+	CheckOKStatus(t, response)
+
+	_, response, err = th.SystemAdminClient.RestoreGroup(ctx, created.Id, "")
+	require.NoError(t, err)
+	CheckOKStatus(t, response)
+
+	th.RemovePermissionFromRole(t, model.PermissionCreateCustomGroup.Id, model.SystemUserRoleId)
+	defer th.AddPermissionToRole(t, model.PermissionCreateCustomGroup.Id, model.SystemUserRoleId)
+	_, response, err = th.Client.CreateGroup(ctx, &model.Group{
+		DisplayName:    "Unauthorized",
+		Name:           new("unauthorized_" + model.NewId()),
+		Source:         model.GroupSourceCustom,
+		AllowReference: true,
+	})
+	require.Error(t, err)
+	CheckForbiddenStatus(t, response)
+
+	th.App.UpdateConfig(func(cfg *model.Config) {
+		*cfg.ServiceSettings.EnableCustomGroups = false
+	})
+	defer th.App.UpdateConfig(func(cfg *model.Config) {
+		*cfg.ServiceSettings.EnableCustomGroups = true
+	})
+	_, response, err = th.SystemAdminClient.CreateGroup(ctx, group)
+	require.Error(t, err)
+	CheckBadRequestStatus(t, response)
+
+	// Existing LDAP records remain intact, but cannot be listed or synced.
+	require.NotEmpty(t, ldap.Id)
 }

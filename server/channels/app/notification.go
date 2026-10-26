@@ -1505,7 +1505,9 @@ func (a *App) allowChannelMentions(rctx request.CTX, post *model.Post, numProfil
 
 // allowGroupMentions returns whether or not the group mentions are allowed for the given post.
 func (a *App) allowGroupMentions(rctx request.CTX, post *model.Post) bool {
-	if !model.MinimumProfessionalLicense(a.Srv().License()) {
+	// Custom group mentions work without a paid license, but still require
+	// the existing channel permission and an enabled group feature.
+	if !*a.Config().ServiceSettings.EnableCustomGroups && !model.MinimumProfessionalLicense(a.Srv().License()) {
 		return false
 	}
 
@@ -1525,6 +1527,24 @@ func (a *App) getGroupsAllowedForReferenceInChannel(channel *model.Channel, team
 	var err error
 	groupsMap := make(map[string]*model.Group)
 	opts := model.GroupSearchOpts{FilterAllowReference: true, IncludeMemberCount: true}
+
+	if a.Srv().License() == nil {
+		// An unlicensed server never resolves stale LDAP/plugin group mentions.
+		if !*a.Config().ServiceSettings.EnableCustomGroups {
+			return groupsMap, nil
+		}
+		opts.Source = model.GroupSourceCustom
+		customGroups, getErr := a.Srv().Store().Group().GetGroups(0, 0, opts, nil)
+		if getErr != nil {
+			return nil, errors.Wrap(getErr, "unable to get custom groups")
+		}
+		for _, group := range customGroups {
+			if group.Name != nil {
+				groupsMap[group.Id] = group
+			}
+		}
+		return groupsMap, nil
+	}
 
 	if channel.IsGroupConstrained() || (team != nil && team.IsGroupConstrained()) {
 		var groups []*model.GroupWithSchemeAdmin
