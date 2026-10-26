@@ -688,7 +688,9 @@ func (a *App) FillInPostProps(rctx request.CTX, post *model.Post, channel *model
 
 	matched := atMentionPattern.MatchString(post.Message)
 	shouldAddProp := false
-	if a.Srv().License() != nil && *a.Srv().License().Features.LDAPGroups && matched {
+	license := a.Srv().License()
+	ldapGroupMentions := license != nil && license.Features != nil && license.Features.LDAPGroups != nil && *license.Features.LDAPGroups
+	if matched && (*a.Config().ServiceSettings.EnableCustomGroups || ldapGroupMentions) {
 		hasPermission, _ := a.HasPermissionToChannel(rctx, post.UserId, post.ChannelId, model.PermissionUseGroupMentions)
 		shouldAddProp = !hasPermission
 	}
