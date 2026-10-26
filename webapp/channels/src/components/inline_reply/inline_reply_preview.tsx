@@ -6,6 +6,8 @@ import {useSelector} from 'react-redux';
 
 import type {Post} from '@mattermost/types/posts';
 
+import {Posts} from 'mattermost-redux/constants';
+
 import {Client4} from 'mattermost-redux/client';
 import {getPost} from 'mattermost-redux/selectors/entities/posts';
 import {getCurrentTeamId} from 'mattermost-redux/selectors/entities/teams';
@@ -58,9 +60,9 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
     }, [reference.post_id, cached?.id]);
 
     const source = cached || fetched;
-    const visible = source?.channel_id === channelId && !source.delete_at && source.type === '';
-    const author = useSelector((state: GlobalState) => getUser(state, visible ? source.user_id : ''));
-    const text = visible ? getQuotedMessageText(source.message, reference) : '';
+    const visible = source?.channel_id === channelId && !source.delete_at && source.state !== Posts.POST_DELETED && source.type === '';
+    const author = useSelector((state: GlobalState) => getUser(state, visible && source ? source.user_id : ''));
+    const text = visible && source ? getQuotedMessageText(source.message, reference) : '';
     const authorName = author?.username || 'Message';
 
     useEffect(() => {

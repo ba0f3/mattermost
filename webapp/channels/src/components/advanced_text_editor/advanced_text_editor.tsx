@@ -28,6 +28,7 @@ import {connectionErrorCount} from 'selectors/views/system';
 import LocalStorageStore from 'stores/local_storage_store';
 
 import PostBoxIndicator from 'components/advanced_text_editor/post_box_indicator/post_box_indicator';
+import InlineReplyPreview from 'components/inline_reply/inline_reply_preview';
 import {applyWysiwygFormatting} from 'components/advanced_text_editor/wysiwyg_editor/apply_wysiwyg_formatting';
 import WysiwygEditor from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
 import type {WysiwygEditorHandle} from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
@@ -63,6 +64,8 @@ import type {MarkdownMode} from 'utils/markdown/apply_markdown';
 import {applyMarkdown as applyMarkdownUtil} from 'utils/markdown/apply_markdown';
 import {isErrorInvalidSlashCommand} from 'utils/post_utils';
 import {getDraftRepeatDisabledReason} from 'utils/scheduled_post_repeat';
+import {INLINE_REPLY_EVENT, INLINE_REPLY_PROP, parseInlineReply} from 'utils/inline_reply';
+import type {InlineReplyRequest} from 'utils/inline_reply';
 import {allAtMentions} from 'utils/text_formatting';
 import * as Utils from 'utils/utils';
 
@@ -394,6 +397,41 @@ const AdvancedTextEditor = ({
         rewriteMenuProps,
         isProcessing: rewriteIsProcessing,
     } = useRewrite(draft, handleDraftChange, textboxRef, focusTextbox, setServerError);
+    // Reply in chat is independent from Mattermost's root_id/thread composer.
+    useEffect(() => {
+        if (isInEditMode || rootId || location !== Locations.CENTER) {
+            return;
+        }
+
+        const onInlineReply = (event: Event) => {
+            const detail = (event as CustomEvent<InlineReplyRequest>).detail;
+            if (!detail || detail.channelId !== channelId || isDisabled) {
+                return;
+            }
+            const currentDraft = draftRef.current;
+            if (currentDraft.channelId !== channelId || currentDraft.rootId !== '') {
+                return;
+            }
+
+            handleDraftChange({
+                ...currentDraft,
+                props: {...currentDraft.props, [INLINE_REPLY_PROP]: detail.reference},
+            }, {instant: true});
+            focusTextbox(true);
+        };
+
+        document.addEventListener(INLINE_REPLY_EVENT, onInlineReply);
+        return () => document.removeEventListener(INLINE_REPLY_EVENT, onInlineReply);
+    }, [isInEditMode, rootId, location, channelId, handleDraftChange, focusTextbox, isDisabled]);
+
+    const inlineReplyReference = !isInEditMode && !rootId ? parseInlineReply(draft.props?.[INLINE_REPLY_PROP]) : null;
+    const clearInlineReply = useCallback(() => {
+        const props = {...draftRef.current.props};
+        delete props[INLINE_REPLY_PROP];
+        handleDraftChange({...draftRef.current, props}, {instant: true});
+        focusTextbox(true);
+    }, [handleDraftChange, focusTextbox]);
+
     const hasAIActionsMenu = (aiActionMenuItems?.length ?? 0) > 0 || (aiRewriteEnabled && Boolean(rewriteMenuProps));
     const isDisabled = Boolean(readOnlyChannel || (!enableSharedChannelsDMs && isDMOrGMRemote) || rewriteIsProcessing);
 
@@ -902,6 +940,23 @@ const AdvancedTextEditor = ({
                         tabIndex={-1}
                         className={classNames('AdvancedTextEditor__cell a11y__region', {'inline-composer': inlineComposer})}
                     >
+                        {inlineReplyReference && (
+                            <div className='r2d-inline-reply-composer'>
+                                <InlineReplyPreview
+                                    reference={inlineReplyReference}
+                                    channelId={channelId}
+                                    inComposer={true}
+                                />
+                                <button
+                                    type='button'
+                                    className='r2d-inline-reply-composer__dismiss'
+                                    aria-label='Cancel inline reply'
+                                    onClick={clearInlineReply}
+                                >
+                                    {'×'}
+                                </button>
+                            </div>
+                        )}
                         {!isInEditMode && (priorityLabels || burnOnReadLabels) && (
                             <div className='AdvancedTextEditor__labels'>
                                 <UnifiedLabelsWrapper

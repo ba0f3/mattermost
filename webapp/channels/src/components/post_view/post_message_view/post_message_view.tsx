@@ -11,6 +11,7 @@ import type {Theme} from 'mattermost-redux/selectors/entities/preferences';
 import {isPostEphemeral} from 'mattermost-redux/utils/post_utils';
 
 import PostMarkdown from 'components/post_markdown';
+import InlineReplyPreview from 'components/inline_reply/inline_reply_preview';
 import ShowMore from 'components/post_view/show_more';
 import type {AttachmentTextOverflowType} from 'components/post_view/show_more/show_more';
 
@@ -18,6 +19,7 @@ import Pluggable from 'plugins/pluggable';
 import PluggableErrorBoundary from 'plugins/pluggable/error_boundary';
 import {PostTypes} from 'utils/constants';
 import {getPostTranslatedMessage, getPostTranslation} from 'utils/post_utils';
+import {parseInlineReply, rememberInlineReplySelection} from 'utils/inline_reply';
 import type {TextFormattingOptions} from 'utils/text_formatting';
 import * as Utils from 'utils/utils';
 
@@ -167,15 +169,24 @@ export default class PostMessageView extends React.PureComponent<Props, State> {
         }
 
         const id = isRHS ? `rhsPostMessageText_${post.id}` : `postMessageText_${post.id}`;
+        const inlineReply = parseInlineReply(post.props?.r2d_inline_reply);
 
         const body = (
             <>
+                {inlineReply && (
+                    <InlineReplyPreview
+                        reference={inlineReply}
+                        channelId={post.channel_id}
+                        onHeightChange={this.checkPostOverflow}
+                    />
+                )}
                 <div
                     id={id}
                     className='post-message__text'
                     data-testid='post-message-text'
                     dir='auto'
                     onClick={this.handleFormattedTextClick}
+                    onMouseUp={(event) => rememberInlineReplySelection(post, event.currentTarget)}
                 >
                     <PostMarkdown
                         message={message}

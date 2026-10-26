@@ -48,6 +48,7 @@ import {Locations, ModalIdentifiers, Constants} from 'utils/constants';
 import DelayedAction from 'utils/delayed_action';
 import * as Keyboard from 'utils/keyboard';
 import * as PostUtils from 'utils/post_utils';
+import {requestInlineReply} from 'utils/inline_reply';
 import * as Utils from 'utils/utils';
 
 import type {ModalData} from 'types/actions';
@@ -395,6 +396,16 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         this.props.handleCommentClick?.(e);
     };
 
+    handleReplyInChat = (): void => {
+        requestInlineReply(this.props.post);
+        this.props.handleDropdownOpened?.(false);
+    };
+
+    handleQuoteSelection = (): void => {
+        requestInlineReply(this.props.post, true);
+        this.props.handleDropdownOpened?.(false);
+    };
+
     handleMenuKeydown = (event: React.KeyboardEvent<HTMLDivElement>, forceCloseMenu?: (() => void)) => {
         event.preventDefault();
 
@@ -597,6 +608,12 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         );
 
         const showReply = !isSystemMessage && !isBurnOnReadPost && this.props.location === Locations.CENTER;
+        const showInlineReply = !isSystemMessage && !isBurnOnReadPost &&
+            !this.props.isUnrevealedBurnOnReadPost && !this.props.isReadOnly &&
+            !this.props.channelIsArchived && !this.props.post.failed &&
+            (this.props.location === Locations.CENTER ||
+                this.props.location === Locations.RHS_ROOT ||
+                this.props.location === Locations.RHS_COMMENT);
         const showForward = this.props.canForward;
         const showReactions = Boolean(isMobile && !isSystemMessage && !this.props.isReadOnly && this.props.enableEmojiPicker);
         const showFollowPost = this.props.canFollowThread;
@@ -617,7 +634,7 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
         // 2. BoR post meeting above criteria
         const showDelete = (!isBurnOnReadPost && this.state.canDelete) || shouldShowDeleteForBoR;
 
-        const firstSectionHasItems = showReply || showForward || showReactions || showFollowPost || showMarkAsUnread || showSave || showRemind || showPin || showMove;
+        const firstSectionHasItems = showInlineReply || showReply || showForward || showReactions || showFollowPost || showMarkAsUnread || showSave || showRemind || showPin || showMove;
         const secondSectionHasItems = showShowTranslation || showCopyText || showCopyLink || showSeenBy;
         const thirdSectionHasItems = showEdit || showDelete || showFlagContent;
 
@@ -644,14 +661,42 @@ export class DotMenuClass extends React.PureComponent<Props, State> {
                     class: 'hidden-xs',
                 }}
             >
+                {showInlineReply && (
+                    <>
+                        <Menu.Item
+                            id={`reply_in_chat_${this.props.post.id}`}
+                            data-testid={`reply_in_chat_${this.props.post.id}`}
+                            labels={
+                                <FormattedMessage
+                                    id='r2d.inline_reply.reply_in_chat'
+                                    defaultMessage='Reply in chat'
+                                />
+                            }
+                            leadingElement={<ReplyOutlineIcon size={18}/>}
+                            onClick={this.handleReplyInChat}
+                        />
+                        <Menu.Item
+                            id={`quote_selection_${this.props.post.id}`}
+                            data-testid={`quote_selection_${this.props.post.id}`}
+                            labels={
+                                <FormattedMessage
+                                    id='r2d.inline_reply.quote_selection'
+                                    defaultMessage='Quote selected text'
+                                />
+                            }
+                            leadingElement={<ContentCopyIcon size={18}/>}
+                            onClick={this.handleQuoteSelection}
+                        />
+                    </>
+                )}
                 {showReply &&
                     <Menu.Item
                         id={`reply_to_post_${this.props.post.id}`}
                         data-testid={`reply_to_post_${this.props.post.id}`}
                         labels={
                             <FormattedMessage
-                                id='post_info.reply'
-                                defaultMessage='Reply'
+                                id='r2d.inline_reply.reply_in_thread'
+                                defaultMessage='Reply in thread'
                             />
                         }
                         leadingElement={<ReplyOutlineIcon size={18}/>}
