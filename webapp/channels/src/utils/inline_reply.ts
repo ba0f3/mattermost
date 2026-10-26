@@ -43,7 +43,7 @@ export function parseInlineReply(value: unknown): InlineReplyReference | null {
         return null;
     }
     const ref = value as Record<string, unknown>;
-    if (ref.v !== 1 || typeof ref.post_id !== 'string' || !/^[a-z0-9]{26}$/.test(ref.post_id)) {
+    if (ref.v !== 1 || typeof ref.post_id !== 'string' || !(/^[a-z0-9]{26}$/).test(ref.post_id)) {
         return null;
     }
     const hasStart = Object.hasOwn(ref, 'start');

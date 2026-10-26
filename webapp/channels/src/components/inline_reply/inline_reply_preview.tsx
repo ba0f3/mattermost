@@ -39,9 +39,10 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
         setFetched(null);
         setUnavailable(false);
         if (cached) {
-            return;
+            return undefined;
         }
         let active = true;
+
         // A quoted post can be outside the loaded message window. Fetch it
         // through the authenticated API, never from props or a copied snapshot.
         Client4.getPost(reference.post_id).then((post) => {
@@ -68,10 +69,17 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
         onHeightChange?.();
     }, [source?.id, source?.message, unavailable, onHeightChange]);
 
+    let previewText = 'Loading message…';
+    if (visible) {
+        previewText = text || 'Attachment';
+    } else if (unavailable || source) {
+        previewText = 'Message unavailable';
+    }
+
     const content = (
         <>
             <strong className='r2d-inline-reply__author'>{visible ? authorName : 'Original message'}</strong>
-            <span className='r2d-inline-reply__text'>{visible ? (text || 'Attachment') : (unavailable || source ? 'Message unavailable' : 'Loading message…')}</span>
+            <span className='r2d-inline-reply__text'>{previewText}</span>
         </>
     );
 

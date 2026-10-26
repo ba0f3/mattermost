@@ -28,7 +28,6 @@ import {connectionErrorCount} from 'selectors/views/system';
 import LocalStorageStore from 'stores/local_storage_store';
 
 import PostBoxIndicator from 'components/advanced_text_editor/post_box_indicator/post_box_indicator';
-import InlineReplyPreview from 'components/inline_reply/inline_reply_preview';
 import {applyWysiwygFormatting} from 'components/advanced_text_editor/wysiwyg_editor/apply_wysiwyg_formatting';
 import WysiwygEditor from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
 import type {WysiwygEditorHandle} from 'components/advanced_text_editor/wysiwyg_editor/wysiwyg_editor';
@@ -42,6 +41,7 @@ import {
     DropOverlayIdCreatePost,
     DropOverlayIdEditPost, FileUploadOverlay,
 } from 'components/file_upload_overlay/file_upload_overlay';
+import InlineReplyPreview from 'components/inline_reply/inline_reply_preview';
 import RhsSuggestionList from 'components/suggestion/rhs_suggestion_list';
 import SuggestionList from 'components/suggestion/suggestion_list';
 import Textbox from 'components/textbox';
@@ -60,12 +60,12 @@ import Constants, {
     AdvancedTextEditorTextboxIds,
 } from 'utils/constants';
 import {canUploadFiles as canUploadFilesAccordingToConfig} from 'utils/file_utils';
+import {INLINE_REPLY_EVENT, INLINE_REPLY_PROP, parseInlineReply} from 'utils/inline_reply';
+import type {InlineReplyRequest} from 'utils/inline_reply';
 import type {MarkdownMode} from 'utils/markdown/apply_markdown';
 import {applyMarkdown as applyMarkdownUtil} from 'utils/markdown/apply_markdown';
 import {isErrorInvalidSlashCommand} from 'utils/post_utils';
 import {getDraftRepeatDisabledReason} from 'utils/scheduled_post_repeat';
-import {INLINE_REPLY_EVENT, INLINE_REPLY_PROP, parseInlineReply} from 'utils/inline_reply';
-import type {InlineReplyRequest} from 'utils/inline_reply';
 import {allAtMentions} from 'utils/text_formatting';
 import * as Utils from 'utils/utils';
 
@@ -402,7 +402,7 @@ const AdvancedTextEditor = ({
     // Reply in chat is independent from Mattermost's root_id/thread composer.
     useEffect(() => {
         if (isInEditMode || rootId || location !== Locations.CENTER) {
-            return;
+            return undefined;
         }
 
         const onInlineReply = (event: Event) => {

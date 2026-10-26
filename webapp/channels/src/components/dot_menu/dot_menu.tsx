@@ -46,9 +46,9 @@ import PostSeenByModal from 'components/post_seen_by_modal';
 import {createBurnOnReadDeleteModalHandlers} from 'hooks/useBurnOnReadDeleteModal';
 import {Locations, ModalIdentifiers, Constants} from 'utils/constants';
 import DelayedAction from 'utils/delayed_action';
+import {requestInlineReply} from 'utils/inline_reply';
 import * as Keyboard from 'utils/keyboard';
 import * as PostUtils from 'utils/post_utils';
-import {requestInlineReply} from 'utils/inline_reply';
 import * as Utils from 'utils/utils';
 
 import type {ModalData} from 'types/actions';
