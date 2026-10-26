@@ -18,6 +18,7 @@ import mergeObjects from 'packages/mattermost-redux/test/merge_objects';
 import {renderWithContext, userEvent, screen, act, createEvent, fireEvent} from 'tests/react_testing_utils';
 import Constants, {Locations, PostTypes, Preferences, StoragePrefixes} from 'utils/constants';
 import {TestHelper} from 'utils/test_helper';
+import {requestInlineReply} from 'utils/inline_reply';
 
 import type {PostDraft} from 'types/store/draft';
 
@@ -34,6 +35,8 @@ jest.mock('actions/views/create_comment', () => ({
     ...jest.requireActual('actions/views/create_comment'),
     onSubmit: jest.fn(() => () => Promise.resolve({data: true})),
 }));
+
+jest.mock('components/inline_reply/inline_reply_preview', () => () => <div data-testid='inline-quote-chip'/>);
 
 jest.mock('utils/exec_commands.ts', () => ({
     focusAndInsertText: (element: HTMLElement, text: string) => {
@@ -264,6 +267,32 @@ describe('components/avanced_text_editor/advanced_text_editor', () => {
         } else {
             expect(screen.queryByRole('button', {name: 'bold'})).not.toBeInTheDocument();
         }
+    });
+
+    it('attaches an inline quote only to the active channel draft and allows cancellation', async () => {
+        renderWithContext(<AdvancedTextEditor {...baseProps}/>, initialState);
+        const postId = 'abcdefghijklmnopqrstuvwxyz';
+
+        mockedUpdateDraft.mockClear();
+        act(() => {
+            requestInlineReply({id: postId, channel_id: otherChannelId, message: 'Other'} as any);
+        });
+        expect(screen.queryByRole('button', {name: 'Cancel inline reply'})).not.toBeInTheDocument();
+
+        act(() => {
+            requestInlineReply({id: postId, channel_id: channelId, message: 'Original'} as any);
+        });
+        expect(screen.getByRole('button', {name: 'Cancel inline reply'})).toBeInTheDocument();
+        expect(mockedUpdateDraft).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({
+                props: {r2d_inline_reply: {v: 1, post_id: postId}},
+            }),
+            '',
+        );
+
+        await userEvent.click(screen.getByRole('button', {name: 'Cancel inline reply'}));
+        expect(screen.queryByRole('button', {name: 'Cancel inline reply'})).not.toBeInTheDocument();
     });
 
     describe('keyDown behavior', () => {

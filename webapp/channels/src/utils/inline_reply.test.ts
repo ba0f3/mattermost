@@ -6,6 +6,7 @@ import type {Post} from '@mattermost/types/posts';
 import {
     getQuotedMessageText,
     parseInlineReply,
+    rememberInlineReplySelection,
     requestInlineReply,
     INLINE_REPLY_EVENT,
 } from './inline_reply';
@@ -25,6 +26,31 @@ describe('inline reply reference', () => {
         expect(parseInlineReply({v: 1, post_id: id, start: -1, end: 1})).toBeNull();
         expect(parseInlineReply({v: 1, post_id: id, start: 2, end: 503})).toBeNull();
         expect(parseInlineReply({v: 2, post_id: id})).toBeNull();
+    });
+
+    test('captures a selection before the message menu removes the browser selection', () => {
+        const element = document.createElement('div');
+        element.textContent = 'Xin chào 👋';
+        document.body.appendChild(element);
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.setStart(element.firstChild!, 9);
+        range.setEnd(element.firstChild!, 11);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+
+        const post = {id, channel_id: id, message: 'Xin chào 👋'} as Post;
+        rememberInlineReplySelection(post, element);
+        selection?.removeAllRanges();
+
+        const listener = jest.fn();
+        document.addEventListener(INLINE_REPLY_EVENT, listener);
+        requestInlineReply(post, true);
+        expect((listener.mock.calls[0][0] as CustomEvent).detail.reference).toEqual({
+            v: 1, post_id: id, start: 9, end: 11,
+        });
+        document.removeEventListener(INLINE_REPLY_EVENT, listener);
+        element.remove();
     });
 
     test('keeps a normal reply in the channel timeline instead of using root_id', () => {
