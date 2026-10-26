@@ -3,6 +3,7 @@
 
 import React, {useEffect, useState} from 'react';
 import {useSelector} from 'react-redux';
+import {Link} from 'react-router-dom';
 
 import type {Post} from '@mattermost/types/posts';
 
@@ -94,15 +95,18 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
         );
     }
 
+    // Keep permalink navigation inside the app. The permalink route focuses
+    // the original post (loading older messages if needed), whereas a plain
+    // <a href> reloads Mattermost and loses the current channel scroll state.
     return (
-        <a
+        <Link
             className='r2d-inline-reply r2d-inline-reply--link'
             data-testid='r2d-inline-reply-preview'
-            href={url}
+            to={url}
             aria-label={'Jump to quoted message from ' + authorName}
         >
             {content}
-        </a>
+        </Link>
     );
 };
 

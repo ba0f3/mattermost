@@ -1,11 +1,12 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+import {createMemoryHistory} from 'history';
 import React from 'react';
 
 import type {Post} from '@mattermost/types/posts';
 
-import {renderWithContext, screen} from 'tests/react_testing_utils';
+import {renderWithContext, screen, userEvent} from 'tests/react_testing_utils';
 
 import InlineReplyPreview from './inline_reply_preview';
 
@@ -42,6 +43,24 @@ describe('InlineReplyPreview', () => {
         expect(screen.getByText('Minh')).toBeInTheDocument();
         expect(screen.getByText('Xin chào')).toBeInTheDocument();
         expect(screen.getByRole('link')).toHaveAttribute('href', `/team1/pl/${id}`);
+    });
+
+    test('jumps to the original post via in-app routing instead of reloading the page', async () => {
+        const history = createMemoryHistory({initialEntries: ['/team1/channels/general']});
+        renderWithContext(
+            <InlineReplyPreview
+                channelId='channel1'
+                reference={{v: 1, post_id: id}}
+            />,
+            initialState,
+            {history},
+        );
+
+        await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+
+        // A normal anchor would leave memory history unchanged and navigate the browser.
+        // React Router pushes the permalink; Mattermost then focuses/scrolls to the post.
+        expect(history.location.pathname).toBe(`/team1/pl/${id}`);
     });
 
     test('does not display quoted content when a message is deleted', () => {
