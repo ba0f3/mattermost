@@ -397,6 +397,8 @@ const AdvancedTextEditor = ({
         rewriteMenuProps,
         isProcessing: rewriteIsProcessing,
     } = useRewrite(draft, handleDraftChange, textboxRef, focusTextbox, setServerError);
+    const isDisabled = Boolean(readOnlyChannel || (!enableSharedChannelsDMs && isDMOrGMRemote) || rewriteIsProcessing);
+
     // Reply in chat is independent from Mattermost's root_id/thread composer.
     useEffect(() => {
         if (isInEditMode || rootId || location !== Locations.CENTER) {
@@ -433,7 +435,6 @@ const AdvancedTextEditor = ({
     }, [handleDraftChange, focusTextbox]);
 
     const hasAIActionsMenu = (aiActionMenuItems?.length ?? 0) > 0 || (aiRewriteEnabled && Boolean(rewriteMenuProps));
-    const isDisabled = Boolean(readOnlyChannel || (!enableSharedChannelsDMs && isDMOrGMRemote) || rewriteIsProcessing);
 
     const [attachmentPreview, fileUploadJSX] = useUploadFiles(
         draft,
@@ -882,7 +883,7 @@ const AdvancedTextEditor = ({
         );
     }, [isInEditMode, isRHS]);
 
-    const inlineComposer = !showFormattingBar && !showPreview && !attachmentPreview && !priorityLabels && !burnOnReadLabels;
+    const inlineComposer = !showFormattingBar && !showPreview && !attachmentPreview && !priorityLabels && !burnOnReadLabels && !inlineReplyReference;
     const showFormattingSpacer = isMessageLong || showPreview || attachmentPreview || isRHS || isThreadView;
 
     const containsAtMentionsInMessage = allAtMentions(draft?.message)?.length > 0;
