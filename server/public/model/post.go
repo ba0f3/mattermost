@@ -106,6 +106,7 @@ const (
 	PostPropsSilentNotification       = "silent_notification"
 	PostPropsChannelMentions          = "channel_mentions"
 	PostPropsCurrentTeamId            = "current_team_id"
+	PostPropsInlineReply              = "r2d_inline_reply" // A reference only, never a copied message body.
 	PostPropsUnsafeLinks              = "unsafe_links"
 	PostPropsAIGeneratedByUserID      = "ai_generated_by"
 	PostPropsAIGeneratedByUsername    = "ai_generated_by_username"

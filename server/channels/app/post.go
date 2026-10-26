@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"regexp"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -424,6 +425,11 @@ func (a *App) CreatePost(rctx request.CTX, post *model.Post, channel *model.Chan
 				return nil, false, appErr
 			}
 		}
+	}
+
+	// Validate after message hooks as integrations can modify post props.
+	if appErr := a.validateInlineReply(rctx, post); appErr != nil {
+		return nil, false, appErr
 	}
 
 	// Pre-fill the CreateAt field for link previews to get the correct timestamp.
@@ -1122,6 +1128,14 @@ func (a *App) UpdatePost(rctx request.CTX, receivedUpdatedPost *model.Post, upda
 		newPost, appErr2 = a.runGuardedMessageWillBeUpdated(rctx, newPost, oldPost)
 		if appErr2 != nil {
 			return nil, false, appErr2
+		}
+	}
+
+	// An existing reference may outlive its source; normal text edits must still
+	// work. Only a changed inline quote reference needs revalidation.
+	if !reflect.DeepEqual(oldPost.GetProp(model.PostPropsInlineReply), newPost.GetProp(model.PostPropsInlineReply)) {
+		if appErr := a.validateInlineReply(rctx, newPost); appErr != nil {
+			return nil, false, appErr
 		}
 	}
 
