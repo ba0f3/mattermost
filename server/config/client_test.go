@@ -49,6 +49,7 @@ func TestGetClientConfig(t *testing.T) {
 				"WebsocketURL":                     "ws://mattermost.example.com:8065",
 				"WebsocketPort":                    "80",
 				"WebsocketSecurePort":              "443",
+				"EnableCustomGroups":                "true",
 			},
 			nil,
 		},
@@ -207,6 +208,20 @@ func TestGetClientConfig(t *testing.T) {
 				Features:     &model.Features{},
 				SkuShortName: "other",
 			},
+			map[string]string{
+				"EnableCustomGroups": "true",
+			},
+			nil,
+		},
+		{
+			"Custom groups can be disabled without a license",
+			&model.Config{
+				ServiceSettings: model.ServiceSettings{
+					EnableCustomGroups: new(false),
+				},
+			},
+			"",
+			nil,
 			map[string]string{
 				"EnableCustomGroups": "false",
 			},

@@ -1812,8 +1812,8 @@ func TestAllowGroupMentions(t *testing.T) {
 			license *model.License
 			want    bool
 		}{
-			"no license":                        {nil, false},
-			"license with wrong SKU short name": {getLicWithSkuShortName("foobar"), false},
+			"no license":                        {nil, true},
+			"license with wrong SKU short name": {getLicWithSkuShortName("foobar"), true},
 			"'professional' license":            {getLicWithSkuShortName(model.LicenseShortSkuProfessional), true},
 			"'enterprise' license":              {getLicWithSkuShortName(model.LicenseShortSkuEnterprise), true},
 		}
@@ -1825,6 +1825,17 @@ func TestAllowGroupMentions(t *testing.T) {
 				assert.Equal(t, tc.want, got)
 			})
 		}
+	})
+
+	t.Run("disabled custom groups without license", func(t *testing.T) {
+		th.App.Srv().SetLicense(nil)
+		th.App.UpdateConfig(func(cfg *model.Config) {
+			*cfg.ServiceSettings.EnableCustomGroups = false
+		})
+		assert.False(t, th.App.allowGroupMentions(th.Context, post))
+		th.App.UpdateConfig(func(cfg *model.Config) {
+			*cfg.ServiceSettings.EnableCustomGroups = true
+		})
 	})
 
 	// we set the enterprise license for the rest of the tests
@@ -2963,6 +2974,8 @@ func TestInsertGroupMentions(t *testing.T) {
 func TestGetGroupsAllowedForReferenceInChannel(t *testing.T) {
 	mainHelper.Parallel(t)
 	th := Setup(t).InitBasic(t)
+	// LDAP and group-constrained references require a licensed instance.
+	th.App.Srv().SetLicense(getLicWithSkuShortName(model.LicenseShortSkuProfessional))
 
 	var err *model.AppError
 
@@ -3750,4 +3763,45 @@ func TestShouldAckWebsocketNotification(t *testing.T) {
 		assert.True(t, shouldAckWebsocketNotification(model.ChannelTypeGroup, model.UserNotifyMention, model.ChannelNotifyDefault))
 		assert.True(t, shouldAckWebsocketNotification(model.ChannelTypeGroup, model.UserNotifyNone, model.ChannelNotifyMention))
 	})
+}
+
+func TestCustomGroupMentionsWithoutLicense(t *testing.T) {
+	mainHelper.Parallel(t)
+	th := Setup(t).InitBasic(t)
+	th.App.Srv().SetLicense(nil)
+
+	_, appErr := th.App.AddUserToChannel(th.Context, th.BasicUser2, th.BasicChannel, false)
+	require.Nil(t, appErr)
+
+	groupName := "team_" + model.NewId()
+	group, appErr := th.App.CreateGroup(&model.Group{
+		DisplayName:    "IT team",
+		Name:           &groupName,
+		Source:         model.GroupSourceCustom,
+		AllowReference: true,
+	})
+	require.Nil(t, appErr)
+	_, appErr = th.App.UpsertGroupMember(group.Id, th.BasicUser2.Id)
+	require.Nil(t, appErr)
+
+	ldap := th.CreateGroup(t)
+	ldap.AllowReference = true
+	_, appErr = th.App.UpdateGroup(ldap)
+	require.Nil(t, appErr)
+
+	allowed, err := th.App.getGroupsAllowedForReferenceInChannel(th.BasicChannel, th.BasicTeam)
+	require.NoError(t, err)
+	require.Contains(t, allowed, group.Id)
+	require.NotContains(t, allowed, ldap.Id)
+
+	post, _, appErr := th.App.CreatePost(th.Context, &model.Post{
+		UserId:    th.BasicUser.Id,
+		ChannelId: th.BasicChannel.Id,
+		Message:   "Please review @" + groupName,
+	}, th.BasicChannel, model.CreatePostFlags{SetOnline: true})
+	require.Nil(t, appErr)
+
+	mentions, err := th.App.SendNotifications(th.Context, post, th.BasicTeam, th.BasicChannel, th.BasicUser, nil, true)
+	require.NoError(t, err)
+	require.Contains(t, mentions, th.BasicUser2.Id)
 }
