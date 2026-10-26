@@ -17,8 +17,8 @@ import type Textbox from 'components/textbox/textbox';
 import mergeObjects from 'packages/mattermost-redux/test/merge_objects';
 import {renderWithContext, userEvent, screen, act, createEvent, fireEvent} from 'tests/react_testing_utils';
 import Constants, {Locations, PostTypes, Preferences, StoragePrefixes} from 'utils/constants';
-import {TestHelper} from 'utils/test_helper';
 import {requestInlineReply} from 'utils/inline_reply';
+import {TestHelper} from 'utils/test_helper';
 
 import type {PostDraft} from 'types/store/draft';
 

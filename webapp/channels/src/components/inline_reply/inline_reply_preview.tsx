@@ -26,6 +26,7 @@ import './inline_reply_preview.scss';
 // Only animate a nearby, already-rendered post. Scrolling across an unloaded
 // virtualized message range causes remeasurement jumps instead of smooth motion.
 const MAX_SMOOTH_SCROLL_VIEWPORTS = 2;
+
 // A data attribute survives React post-class updates while scrolling.
 const TARGET_HIGHLIGHT_ATTRIBUTE = 'data-r2d-inline-reply-highlight';
 const TARGET_HIGHLIGHT_DURATION_MS = 2200;
@@ -38,6 +39,7 @@ function highlightQuotedPost(target: HTMLElement) {
     }
 
     target.removeAttribute(TARGET_HIGHLIGHT_ATTRIBUTE);
+
     // Flush styles so repeated clicks restart the highlight animation.
     target.getBoundingClientRect();
     target.setAttribute(TARGET_HIGHLIGHT_ATTRIBUTE, 'true');
@@ -150,6 +152,7 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
             top: Math.max(0, scroller.scrollTop + delta),
             behavior: reducedMotion ? 'auto' : 'smooth',
         });
+
         // A short smooth scroll bypasses the permalink focus action, so we
         // apply its familiar themed post highlight to the original message.
         highlightQuotedPost(target);
