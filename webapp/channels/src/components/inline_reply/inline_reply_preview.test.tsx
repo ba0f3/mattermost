@@ -97,7 +97,7 @@ describe('InlineReplyPreview', () => {
             await userEvent.click(screen.getByRole('button', {name: 'Jump to quoted message from Minh'}));
 
             expect(scrollTo).toHaveBeenCalledWith({top: 25, behavior: 'smooth'});
-            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
+            expect(target).toHaveAttribute('data-r2d-inline-reply-highlight', 'true');
             expect(history.location.pathname).toBe('/team1/channels/general');
         } finally {
             postList.remove();
@@ -135,7 +135,7 @@ describe('InlineReplyPreview', () => {
             await userEvent.click(screen.getByRole('button', {name: 'Jump to quoted message from Minh'}));
 
             expect(scrollTo).not.toHaveBeenCalled();
-            expect(target).not.toHaveClass('r2d-inline-reply-target--highlight');
+            expect(target).not.toHaveAttribute('data-r2d-inline-reply-highlight');
             expect(history.location.pathname).toBe(`/team1/pl/${id}`);
         } finally {
             postList.remove();
@@ -192,7 +192,7 @@ describe('InlineReplyPreview', () => {
 
             const card = screen.getByRole('button', {name: 'Jump to quoted message from Minh'});
             fireEvent.click(card);
-            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
+            expect(target).toHaveAttribute('data-r2d-inline-reply-highlight', 'true');
 
             act(() => {
                 jest.advanceTimersByTime(1200);
@@ -201,12 +201,12 @@ describe('InlineReplyPreview', () => {
             act(() => {
                 jest.advanceTimersByTime(1200);
             });
-            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
+            expect(target).toHaveAttribute('data-r2d-inline-reply-highlight', 'true');
 
             act(() => {
                 jest.advanceTimersByTime(1100);
             });
-            expect(target).not.toHaveClass('r2d-inline-reply-target--highlight');
+            expect(target).not.toHaveAttribute('data-r2d-inline-reply-highlight');
         } finally {
             postList.remove();
             jest.useRealTimers();

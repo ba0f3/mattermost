@@ -84,12 +84,12 @@
     }
 }
 
-.app__body .app__content .post.r2d-inline-reply-target--highlight {
+.app__body .app__content .post[data-r2d-inline-reply-highlight='true'] {
     animation: r2d-inline-reply-highlight 2200ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .app__body .app__content .post.r2d-inline-reply-target--highlight {
+    .app__body .app__content .post[data-r2d-inline-reply-highlight='true'] {
         animation: none;
         background-color: rgba(var(--mention-highlight-bg-rgb), 0.5);
     }

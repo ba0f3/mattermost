@@ -26,7 +26,8 @@ import './inline_reply_preview.scss';
 // Only animate a nearby, already-rendered post. Scrolling across an unloaded
 // virtualized message range causes remeasurement jumps instead of smooth motion.
 const MAX_SMOOTH_SCROLL_VIEWPORTS = 2;
-const TARGET_HIGHLIGHT_CLASS = 'r2d-inline-reply-target--highlight';
+// A data attribute survives React post-class updates while scrolling.
+const TARGET_HIGHLIGHT_ATTRIBUTE = 'data-r2d-inline-reply-highlight';
 const TARGET_HIGHLIGHT_DURATION_MS = 2200;
 const targetHighlightTimers = new WeakMap<HTMLElement, number>();
 
@@ -36,13 +37,13 @@ function highlightQuotedPost(target: HTMLElement) {
         window.clearTimeout(pending);
     }
 
-    target.classList.remove(TARGET_HIGHLIGHT_CLASS);
+    target.removeAttribute(TARGET_HIGHLIGHT_ATTRIBUTE);
     // Flush styles so repeated clicks restart the highlight animation.
     target.getBoundingClientRect();
-    target.classList.add(TARGET_HIGHLIGHT_CLASS);
+    target.setAttribute(TARGET_HIGHLIGHT_ATTRIBUTE, 'true');
 
     const timer = window.setTimeout(() => {
-        target.classList.remove(TARGET_HIGHLIGHT_CLASS);
+        target.removeAttribute(TARGET_HIGHLIGHT_ATTRIBUTE);
         targetHighlightTimers.delete(target);
     }, TARGET_HIGHLIGHT_DURATION_MS);
     targetHighlightTimers.set(target, timer);
