@@ -41,6 +41,7 @@ import {
     DropOverlayIdCreatePost,
     DropOverlayIdEditPost, FileUploadOverlay,
 } from 'components/file_upload_overlay/file_upload_overlay';
+import InlineReplyPreview from 'components/inline_reply/inline_reply_preview';
 import RhsSuggestionList from 'components/suggestion/rhs_suggestion_list';
 import SuggestionList from 'components/suggestion/suggestion_list';
 import Textbox from 'components/textbox';
@@ -59,6 +60,8 @@ import Constants, {
     AdvancedTextEditorTextboxIds,
 } from 'utils/constants';
 import {canUploadFiles as canUploadFilesAccordingToConfig} from 'utils/file_utils';
+import {INLINE_REPLY_EVENT, INLINE_REPLY_PROP, parseInlineReply} from 'utils/inline_reply';
+import type {InlineReplyRequest} from 'utils/inline_reply';
 import type {MarkdownMode} from 'utils/markdown/apply_markdown';
 import {applyMarkdown as applyMarkdownUtil} from 'utils/markdown/apply_markdown';
 import {isErrorInvalidSlashCommand} from 'utils/post_utils';
@@ -394,8 +397,44 @@ const AdvancedTextEditor = ({
         rewriteMenuProps,
         isProcessing: rewriteIsProcessing,
     } = useRewrite(draft, handleDraftChange, textboxRef, focusTextbox, setServerError);
-    const hasAIActionsMenu = (aiActionMenuItems?.length ?? 0) > 0 || (aiRewriteEnabled && Boolean(rewriteMenuProps));
     const isDisabled = Boolean(readOnlyChannel || (!enableSharedChannelsDMs && isDMOrGMRemote) || rewriteIsProcessing);
+
+    // Reply in chat is independent from Mattermost's root_id/thread composer.
+    useEffect(() => {
+        if (isInEditMode || rootId || location !== Locations.CENTER) {
+            return undefined;
+        }
+
+        const onInlineReply = (event: Event) => {
+            const detail = (event as CustomEvent<InlineReplyRequest>).detail;
+            if (!detail || detail.channelId !== channelId || isDisabled) {
+                return;
+            }
+            const currentDraft = draftRef.current;
+            if (currentDraft.channelId !== channelId || currentDraft.rootId !== '') {
+                return;
+            }
+
+            handleDraftChange({
+                ...currentDraft,
+                props: {...currentDraft.props, [INLINE_REPLY_PROP]: detail.reference},
+            }, {instant: true});
+            focusTextbox(true);
+        };
+
+        document.addEventListener(INLINE_REPLY_EVENT, onInlineReply);
+        return () => document.removeEventListener(INLINE_REPLY_EVENT, onInlineReply);
+    }, [isInEditMode, rootId, location, channelId, handleDraftChange, focusTextbox, isDisabled]);
+
+    const inlineReplyReference = !isInEditMode && !rootId ? parseInlineReply(draft.props?.[INLINE_REPLY_PROP]) : null;
+    const clearInlineReply = useCallback(() => {
+        const props = {...draftRef.current.props};
+        delete props[INLINE_REPLY_PROP];
+        handleDraftChange({...draftRef.current, props}, {instant: true});
+        focusTextbox(true);
+    }, [handleDraftChange, focusTextbox]);
+
+    const hasAIActionsMenu = (aiActionMenuItems?.length ?? 0) > 0 || (aiRewriteEnabled && Boolean(rewriteMenuProps));
 
     const [attachmentPreview, fileUploadJSX] = useUploadFiles(
         draft,
@@ -844,7 +883,7 @@ const AdvancedTextEditor = ({
         );
     }, [isInEditMode, isRHS]);
 
-    const inlineComposer = !showFormattingBar && !showPreview && !attachmentPreview && !priorityLabels && !burnOnReadLabels;
+    const inlineComposer = !showFormattingBar && !showPreview && !attachmentPreview && !priorityLabels && !burnOnReadLabels && !inlineReplyReference;
     const showFormattingSpacer = isMessageLong || showPreview || attachmentPreview || isRHS || isThreadView;
 
     const containsAtMentionsInMessage = allAtMentions(draft?.message)?.length > 0;
@@ -902,6 +941,23 @@ const AdvancedTextEditor = ({
                         tabIndex={-1}
                         className={classNames('AdvancedTextEditor__cell a11y__region', {'inline-composer': inlineComposer})}
                     >
+                        {inlineReplyReference && (
+                            <div className='r2d-inline-reply-composer'>
+                                <InlineReplyPreview
+                                    reference={inlineReplyReference}
+                                    channelId={channelId}
+                                    inComposer={true}
+                                />
+                                <button
+                                    type='button'
+                                    className='r2d-inline-reply-composer__dismiss'
+                                    aria-label='Cancel inline reply'
+                                    onClick={clearInlineReply}
+                                >
+                                    {'×'}
+                                </button>
+                            </div>
+                        )}
                         {!isInEditMode && (priorityLabels || burnOnReadLabels) && (
                             <div className='AdvancedTextEditor__labels'>
                                 <UnifiedLabelsWrapper

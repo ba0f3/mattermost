@@ -41,6 +41,10 @@ export function isPostDraftEmpty(draft: PostDraft): boolean {
     const hasAttachment = draft.fileInfos?.length > 0;
     const hasUploadingFiles = draft.uploadsInProgress?.length > 0;
 
+    // A selected quote may be waiting for message text; keep it in the
+    // channel draft, but do not treat it as a sendable message.
+    const hasInlineReply = Boolean(draft.props?.r2d_inline_reply);
+
     // Check for priority metadata
     const hasPriority = draft.metadata?.priority && (
         draft.metadata.priority.priority ||
@@ -51,7 +55,7 @@ export function isPostDraftEmpty(draft: PostDraft): boolean {
     // Check for burn-on-read
     const hasBurnOnRead = draft.type === PostTypes.BURN_ON_READ;
 
-    return !hasMessage && !hasAttachment && !hasUploadingFiles && !hasPriority && !hasBurnOnRead;
+    return !hasMessage && !hasAttachment && !hasUploadingFiles && !hasPriority && !hasBurnOnRead && !hasInlineReply;
 }
 
 export function draftHasAttachments(draft: Pick<PostDraft, 'fileInfos' | 'uploadsInProgress'>): boolean {

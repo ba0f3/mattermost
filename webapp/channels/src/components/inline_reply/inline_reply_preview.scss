@@ -1,0 +1,128 @@
+.r2d-inline-reply {
+    display: flex;
+    width: 100%;
+    max-width: 440px;
+    min-width: 0;
+    align-items: center;
+    padding: 6px 10px;
+    border: 0;
+    border-left: 3px solid var(--button-bg);
+    border-radius: 0 var(--radius-s) var(--radius-s) 0;
+    background: rgba(var(--center-channel-color-rgb), 0.045);
+    box-shadow: none;
+    color: var(--center-channel-color);
+    font-family: inherit;
+    font-size: inherit;
+    gap: 10px;
+    line-height: 1.4;
+    text-align: left;
+    text-decoration: none;
+
+    &__content {
+        display: flex;
+        min-width: 0;
+        flex: 1;
+        flex-direction: column;
+        gap: 1px;
+    }
+
+    &__author {
+        overflow: hidden;
+        color: var(--center-channel-color);
+        font-size: 12px;
+        font-weight: 600;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__text {
+        display: block;
+        overflow: hidden;
+        color: rgba(var(--center-channel-color-rgb), 0.7);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    &__jump-icon {
+        flex-shrink: 0;
+        color: rgba(var(--center-channel-color-rgb), 0.55);
+        opacity: 0.45;
+        transition: opacity 150ms ease-out;
+    }
+
+    &--jump {
+        margin: 0 0 5px;
+        appearance: none;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+            background: rgba(var(--center-channel-color-rgb), 0.085);
+
+            .r2d-inline-reply__jump-icon {
+                opacity: 1;
+            }
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--button-bg);
+            outline-offset: 2px;
+        }
+    }
+}
+
+// Match the original Mattermost permalink highlight when the jump is local.
+@keyframes r2d-inline-reply-highlight {
+    0%,
+    50% {
+        background-color: rgba(var(--mention-highlight-bg-rgb), 0.5);
+    }
+
+    100% {
+        background-color: transparent;
+    }
+}
+
+.app__body .app__content .post[data-r2d-inline-reply-highlight='true'] {
+    animation: r2d-inline-reply-highlight 2200ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .app__body .app__content .post[data-r2d-inline-reply-highlight='true'] {
+        animation: none;
+        background-color: rgba(var(--mention-highlight-bg-rgb), 0.5);
+    }
+
+    .r2d-inline-reply__jump-icon {
+        transition: none;
+    }
+}
+
+.r2d-inline-reply-composer {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-bottom: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+    gap: 8px;
+
+    > .r2d-inline-reply {
+        min-width: 0;
+        flex: 1;
+        background: transparent;
+    }
+
+    &__dismiss {
+        padding: 3px 8px;
+        border: 0;
+        border-radius: var(--radius-s);
+        background: transparent;
+        color: rgba(var(--center-channel-color-rgb), 0.7);
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+            background: rgba(var(--center-channel-color-rgb), 0.08);
+        }
+    }
+}

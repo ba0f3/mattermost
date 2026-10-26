@@ -9,9 +9,10 @@ import {CheckAllIcon, CheckIcon} from '@mattermost/compass-icons/components';
 import {WithTooltip} from '@mattermost/shared/components/tooltip';
 import type {Post} from '@mattermost/types/posts';
 
-import {openModal} from 'actions/views/modals';
 import {getPostsSeenStatusBatched} from 'mattermost-redux/actions/read_receipts';
 import {canShowPostReadReceipts, getPostSeenStatus} from 'mattermost-redux/selectors/entities/read_receipts';
+
+import {openModal} from 'actions/views/modals';
 
 import PostSeenByModal from 'components/post_seen_by_modal';
 
