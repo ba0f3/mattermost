@@ -63,6 +63,82 @@ describe('InlineReplyPreview', () => {
         expect(history.location.pathname).toBe(`/team1/pl/${id}`);
     });
 
+    test('smoothly scrolls to a nearby, rendered post without changing the URL', async () => {
+        const history = createMemoryHistory({initialEntries: ['/team1/channels/general']});
+        const postList = document.createElement('div');
+        postList.id = 'postListContent';
+        postList.dataset.channelId = 'channel1';
+
+        const scroller = document.createElement('div');
+        scroller.id = 'postListScrollContainer';
+        scroller.scrollTop = 100;
+        Object.defineProperty(scroller, 'clientHeight', {value: 400, configurable: true});
+        jest.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({top: 100} as DOMRect);
+        const scrollTo = jest.fn();
+        scroller.scrollTo = scrollTo;
+
+        const target = document.createElement('div');
+        target.id = `post_${id}`;
+        jest.spyOn(target, 'getBoundingClientRect').mockReturnValue({top: 200, height: 50} as DOMRect);
+        scroller.appendChild(target);
+        postList.appendChild(scroller);
+        document.body.appendChild(postList);
+
+        try {
+            renderWithContext(
+                <InlineReplyPreview
+                    channelId='channel1'
+                    reference={{v: 1, post_id: id}}
+                />,
+                initialState,
+                {history},
+            );
+            await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+
+            expect(scrollTo).toHaveBeenCalledWith({top: 25, behavior: 'smooth'});
+            expect(history.location.pathname).toBe('/team1/channels/general');
+        } finally {
+            postList.remove();
+        }
+    });
+
+    test('uses permalink navigation for distant posts instead of animating unloaded history', async () => {
+        const history = createMemoryHistory({initialEntries: ['/team1/channels/general']});
+        const postList = document.createElement('div');
+        postList.id = 'postListContent';
+        postList.dataset.channelId = 'channel1';
+
+        const scroller = document.createElement('div');
+        scroller.id = 'postListScrollContainer';
+        Object.defineProperty(scroller, 'clientHeight', {value: 400, configurable: true});
+        jest.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({top: 0} as DOMRect);
+        const scrollTo = jest.fn();
+        scroller.scrollTo = scrollTo;
+        const target = document.createElement('div');
+        target.id = `post_${id}`;
+        jest.spyOn(target, 'getBoundingClientRect').mockReturnValue({top: 1800, height: 50} as DOMRect);
+        scroller.appendChild(target);
+        postList.appendChild(scroller);
+        document.body.appendChild(postList);
+
+        try {
+            renderWithContext(
+                <InlineReplyPreview
+                    channelId='channel1'
+                    reference={{v: 1, post_id: id}}
+                />,
+                initialState,
+                {history},
+            );
+            await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+
+            expect(scrollTo).not.toHaveBeenCalled();
+            expect(history.location.pathname).toBe(`/team1/pl/${id}`);
+        } finally {
+            postList.remove();
+        }
+    });
+
     test('does not display quoted content when a message is deleted', () => {
         const deletedState = {
             entities: {

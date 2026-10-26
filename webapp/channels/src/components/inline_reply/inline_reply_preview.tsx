@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {useSelector} from 'react-redux';
 import {Link} from 'react-router-dom';
 
@@ -21,6 +21,10 @@ import type {InlineReplyReference} from 'utils/inline_reply';
 import type {GlobalState} from 'types/store';
 
 import './inline_reply_preview.scss';
+
+// Only animate a nearby, already-rendered post. Scrolling across an unloaded
+// virtualized message range causes remeasurement jumps instead of smooth motion.
+const MAX_SMOOTH_SCROLL_VIEWPORTS = 2;
 
 type Props = {
     reference: InlineReplyReference;
@@ -84,6 +88,41 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
         </>
     );
 
+    const handleJumpClick = useCallback((event: React.MouseEvent<HTMLAnchorElement>) => {
+        // Let modified clicks use standard link behavior (open in a new tab,
+        // etc.). A normal click must not also trigger the parent post click.
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+            return;
+        }
+        event.stopPropagation();
+
+        // Posts are virtualized: only scroll smoothly when the original post
+        // is actually mounted in this channel. Distant/unloaded posts continue
+        // through Mattermost's existing permalink loader.
+        const target = document.getElementById(`post_${reference.post_id}`);
+        const scroller = target?.closest<HTMLElement>('#postListScrollContainer');
+        const postList = scroller?.closest<HTMLElement>('#postListContent');
+        if (!target || !scroller || postList?.dataset.channelId !== channelId || scroller.clientHeight <= 0) {
+            return;
+        }
+
+        const targetRect = target.getBoundingClientRect();
+        const scrollerRect = scroller.getBoundingClientRect();
+        const delta = targetRect.top - scrollerRect.top -
+            ((scroller.clientHeight - targetRect.height) / 2);
+
+        if (Math.abs(delta) > scroller.clientHeight * MAX_SMOOTH_SCROLL_VIEWPORTS) {
+            return;
+        }
+
+        event.preventDefault();
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        scroller.scrollTo({
+            top: Math.max(0, scroller.scrollTop + delta),
+            behavior: reducedMotion ? 'auto' : 'smooth',
+        });
+    }, [reference.post_id, channelId]);
+
     if (!visible || inComposer) {
         return (
             <div
@@ -103,6 +142,7 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
             className='r2d-inline-reply r2d-inline-reply--link'
             data-testid='r2d-inline-reply-preview'
             to={url}
+            onClick={handleJumpClick}
             aria-label={'Jump to quoted message from ' + authorName}
         >
             {content}
