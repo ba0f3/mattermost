@@ -6,7 +6,7 @@ import React from 'react';
 
 import type {Post} from '@mattermost/types/posts';
 
-import {renderWithContext, screen, userEvent} from 'tests/react_testing_utils';
+import {act, fireEvent, renderWithContext, screen, userEvent} from 'tests/react_testing_utils';
 
 import InlineReplyPreview from './inline_reply_preview';
 
@@ -32,7 +32,7 @@ const initialState = {
 };
 
 describe('InlineReplyPreview', () => {
-    test('renders the current authorized source and a direct permalink', () => {
+    test('renders a compact, accessible quote card rather than a hyperlink', () => {
         renderWithContext(
             <InlineReplyPreview
                 channelId='channel1'
@@ -42,7 +42,8 @@ describe('InlineReplyPreview', () => {
         );
         expect(screen.getByText('Minh')).toBeInTheDocument();
         expect(screen.getByText('Xin chào')).toBeInTheDocument();
-        expect(screen.getByRole('link')).toHaveAttribute('href', `/team1/pl/${id}`);
+        expect(screen.getByRole('button', {name: 'Jump to quoted message from Minh'})).toHaveClass('r2d-inline-reply--jump');
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
     });
 
     test('jumps to the original post via in-app routing instead of reloading the page', async () => {
@@ -56,10 +57,10 @@ describe('InlineReplyPreview', () => {
             {history},
         );
 
-        await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+        await userEvent.click(screen.getByRole('button', {name: 'Jump to quoted message from Minh'}));
 
-        // A normal anchor would leave memory history unchanged and navigate the browser.
-        // React Router pushes the permalink; Mattermost then focuses/scrolls to the post.
+        // The message-card button uses SPA history; Mattermost focuses the permalink
+        // without reloading the whole browser page.
         expect(history.location.pathname).toBe(`/team1/pl/${id}`);
     });
 
@@ -93,9 +94,10 @@ describe('InlineReplyPreview', () => {
                 initialState,
                 {history},
             );
-            await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+            await userEvent.click(screen.getByRole('button', {name: 'Jump to quoted message from Minh'}));
 
             expect(scrollTo).toHaveBeenCalledWith({top: 25, behavior: 'smooth'});
+            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
             expect(history.location.pathname).toBe('/team1/channels/general');
         } finally {
             postList.remove();
@@ -130,9 +132,10 @@ describe('InlineReplyPreview', () => {
                 initialState,
                 {history},
             );
-            await userEvent.click(screen.getByRole('link', {name: 'Jump to quoted message from Minh'}));
+            await userEvent.click(screen.getByRole('button', {name: 'Jump to quoted message from Minh'}));
 
             expect(scrollTo).not.toHaveBeenCalled();
+            expect(target).not.toHaveClass('r2d-inline-reply-target--highlight');
             expect(history.location.pathname).toBe(`/team1/pl/${id}`);
         } finally {
             postList.remove();
@@ -155,6 +158,58 @@ describe('InlineReplyPreview', () => {
         );
         expect(screen.getByText('Message unavailable')).toBeInTheDocument();
         expect(screen.queryByText('Xin chào mọi người')).not.toBeInTheDocument();
-        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: 'Jump to quoted message from Minh'})).not.toBeInTheDocument();
+    });
+
+    test('restarts and clears the target highlight when the same quote is clicked again', () => {
+        jest.useFakeTimers();
+
+        const postList = document.createElement('div');
+        postList.id = 'postListContent';
+        postList.dataset.channelId = 'channel1';
+
+        const scroller = document.createElement('div');
+        scroller.id = 'postListScrollContainer';
+        Object.defineProperty(scroller, 'clientHeight', {value: 400, configurable: true});
+        jest.spyOn(scroller, 'getBoundingClientRect').mockReturnValue({top: 0} as DOMRect);
+        scroller.scrollTo = jest.fn();
+
+        const target = document.createElement('div');
+        target.id = `post_${id}`;
+        jest.spyOn(target, 'getBoundingClientRect').mockReturnValue({top: 100, height: 60} as DOMRect);
+        scroller.appendChild(target);
+        postList.appendChild(scroller);
+        document.body.appendChild(postList);
+
+        try {
+            renderWithContext(
+                <InlineReplyPreview
+                    channelId='channel1'
+                    reference={{v: 1, post_id: id}}
+                />,
+                initialState,
+            );
+
+            const card = screen.getByRole('button', {name: 'Jump to quoted message from Minh'});
+            fireEvent.click(card);
+            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
+
+            act(() => {
+                jest.advanceTimersByTime(1200);
+            });
+            fireEvent.click(card);
+            act(() => {
+                jest.advanceTimersByTime(1200);
+            });
+            expect(target).toHaveClass('r2d-inline-reply-target--highlight');
+
+            act(() => {
+                jest.advanceTimersByTime(1100);
+            });
+            expect(target).not.toHaveClass('r2d-inline-reply-target--highlight');
+        } finally {
+            postList.remove();
+            jest.useRealTimers();
+        }
     });
 });
