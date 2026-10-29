@@ -51,6 +51,10 @@ x^2 + y^2 = z^2
     });
 
     describe('lists', () => {
+        test('keeps adjacent lists with different marker types separate', () => {
+            expect(format('- bullet\n1. numbered')).toBe('<ul class="markdown__list"><li>bullet</li></ul><ol class="markdown__list" start="1"><li>numbered</li></ol>');
+        });
+
         test('unordered lists should not include a start index', () => {
             const input = `- a
 - b

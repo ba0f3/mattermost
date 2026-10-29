@@ -38,6 +38,7 @@ export function formatWithRenderer(text: string, renderer: marked.Renderer) {
             return escapeHtml(html);
         },
         gfm: true,
+        smartLists: true,
         tables: true,
         mangle: false,
         inlinelatex: config.EnableLatex === 'true' && config.EnableInlineLatex === 'true',

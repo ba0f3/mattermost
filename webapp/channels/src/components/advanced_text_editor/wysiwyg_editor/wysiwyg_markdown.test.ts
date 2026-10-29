@@ -7,6 +7,8 @@ import Link from '@tiptap/extension-link';
 import {Markdown} from '@tiptap/markdown';
 import StarterKit from '@tiptap/starter-kit';
 
+import {format} from 'utils/markdown';
+
 import {isRedundantLinkText, parseMarkdownContent, serializeToMarkdown, stripRedundantLinkMarks} from './wysiwyg_markdown';
 
 const paragraph = (...content: JSONContent[]): JSONContent => ({
@@ -123,6 +125,18 @@ describe('serializeToMarkdown', () => {
         editor.commands.setContent(paragraph(linkText('https://mmtest.atlassian.net/', 'https://mmtest.atlassian.net/')));
 
         expect(serializeToMarkdown(editor)).toBe('https://mmtest.atlassian.net/');
+    });
+
+    it('renders nested bullets under the ninth numbered item', () => {
+        editor.commands.setContent('<ol><li><p>first</p></li><li><p>second</p></li><li><p>third</p></li><li><p>fourth</p></li><li><p>fifth</p></li><li><p>sixth</p></li><li><p>seventh</p></li><li><p>eighth</p></li><li><p>ninth</p><ul><li><p>child</p></li><li><p>another</p></li></ul></li></ol>');
+
+        const rendered = format(serializeToMarkdown(editor));
+        expect(rendered).toContain('<li>ninth<ul class="markdown__list"><li>child</li><li>another</li></ul></li>');
+    });
+
+    it('renders bullets following a numbered list without turning them into numbered items', () => {
+        editor.commands.setContent('<ol start="9"><li><p>ninth</p></li></ol><ul><li><p>child</p></li><li><p>another</p></li></ul>');
+        expect(format(serializeToMarkdown(editor))).toContain('<ul class="markdown__list"><li>child</li><li>another</li></ul>');
     });
 
     it('keeps a slash command intact', () => {
