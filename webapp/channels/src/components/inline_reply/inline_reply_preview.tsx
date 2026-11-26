@@ -91,7 +91,7 @@ const InlineReplyPreview = ({reference, channelId, onHeightChange, inComposer = 
     }, [reference.post_id, cached?.id]);
 
     const source = cached || fetched;
-    const visible = source?.channel_id === channelId && !source.delete_at && source.state !== Posts.POST_DELETED && (source.type === '' || source.type === 'me');
+    const visible = source?.channel_id === channelId && !source.delete_at && source.state !== Posts.POST_DELETED && (source.type === '' || (source.type as string) === 'me');
     const author = useSelector((state: GlobalState) => getUser(state, visible && source ? source.user_id : ''));
     const text = visible && source ? getQuotedMessageText(source.message, reference) : '';
     const authorName = author?.username || 'Message';
