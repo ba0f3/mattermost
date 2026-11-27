@@ -142,13 +142,8 @@ func uploadFileSimple(c *Context, r *http.Request, timestamp time.Time) *model.F
 	defer c.LogAuditRec(auditRec)
 	model.AddEventParameterToAuditRec(auditRec, "channel_id", c.Params.ChannelId)
 
-	if ok, _ := c.App.SessionHasPermissionToChannel(c.AppContext, *c.AppContext.Session(), c.Params.ChannelId, model.PermissionUploadFile); !ok {
-		c.SetPermissionError(model.PermissionUploadFile)
-		return nil
-	}
-
-	if !c.App.HasPermissionToChannelAction(c.AppContext, c.AppContext.Session().UserId, c.AppContext.Session().Roles, c.Params.ChannelId, model.AccessControlPolicyActionUploadFileAttachment) {
-		c.Err = model.NewAppError("uploadFileSimple", "api.file.upload_file.abac_denied.app_error", nil, "", http.StatusForbidden)
+	checkUploadFileAttachmentPermission(c, "uploadFileSimple", c.Params.ChannelId)
+	if c.Err != nil {
 		return nil
 	}
 
@@ -321,13 +316,8 @@ NextPart:
 		if c.Err != nil {
 			return nil
 		}
-		if ok, _ := c.App.SessionHasPermissionToChannel(c.AppContext, *c.AppContext.Session(), c.Params.ChannelId, model.PermissionUploadFile); !ok {
-			c.SetPermissionError(model.PermissionUploadFile)
-			return nil
-		}
-
-		if !c.App.HasPermissionToChannelAction(c.AppContext, c.AppContext.Session().UserId, c.AppContext.Session().Roles, c.Params.ChannelId, model.AccessControlPolicyActionUploadFileAttachment) {
-			c.Err = model.NewAppError("uploadFileMultipart", "api.file.upload_file.abac_denied.app_error", nil, "", http.StatusForbidden)
+		checkUploadFileAttachmentPermission(c, "uploadFileMultipart", c.Params.ChannelId)
+		if c.Err != nil {
 			return nil
 		}
 
@@ -439,13 +429,8 @@ func uploadFileMultipartLegacy(c *Context, mr *multipart.Reader,
 	if c.Err != nil {
 		return nil
 	}
-	if ok, _ := c.App.SessionHasPermissionToChannel(c.AppContext, *c.AppContext.Session(), channelId, model.PermissionUploadFile); !ok {
-		c.SetPermissionError(model.PermissionUploadFile)
-		return nil
-	}
-
-	if !c.App.HasPermissionToChannelAction(c.AppContext, c.AppContext.Session().UserId, c.AppContext.Session().Roles, channelId, model.AccessControlPolicyActionUploadFileAttachment) {
-		c.Err = model.NewAppError("uploadFileMultipartLegacy", "api.file.upload_file.abac_denied.app_error", nil, "", http.StatusForbidden)
+	checkUploadFileAttachmentPermission(c, "uploadFileMultipartLegacy", channelId)
+	if c.Err != nil {
 		return nil
 	}
 
@@ -528,7 +513,7 @@ func getFile(c *Context, w http.ResponseWriter, r *http.Request) {
 	defer c.LogAuditRec(auditRec)
 	model.AddEventParameterToAuditRec(auditRec, "force_download", forceDownload)
 
-	fileInfos, storeErr := c.App.Srv().Store().FileInfo().GetByIds([]string{c.Params.FileId}, true, true, false)
+	fileInfos, storeErr := c.App.Srv().Store().FileInfo().GetByIds([]string{c.Params.FileId}, true, false, true)
 	if storeErr != nil {
 		c.Err = model.NewAppError("getFile", "api.file.get_file_info.app_error", nil, "", http.StatusInternalServerError)
 		setInaccessibleFileHeader(w, c.Err)
